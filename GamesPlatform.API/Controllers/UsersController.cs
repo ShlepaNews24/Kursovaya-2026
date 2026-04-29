@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using GamesPlatform.API.Data;
 using GamesPlatform.API.Models;
+using Microsoft.AspNetCore.Authorization;
 
 namespace GamesPlatform.API.Controllers
 {
@@ -16,15 +17,22 @@ namespace GamesPlatform.API.Controllers
             _context = context;
         }
 
-        // GET: api/users
+        // Получит список всех пользователей
+        // Доступ у админов
         [HttpGet]
+        [Authorize(Roles = "Admin")]
         public async Task<ActionResult<IEnumerable<User>>> GetUsers()
         {
-            return await _context.Users.ToListAsync();
+            var users = await _context.Users.ToListAsync();
+            foreach (var user in users)
+            {
+                user.PasswordHash = "";  
+            }
+            return users;
         }
 
-        // GET: api/users/5
         [HttpGet("{id}")]
+        [Authorize]  // ← Просмотр своего профиля
         public async Task<ActionResult<User>> GetUser(int id)
         {
             var user = await _context.Users.FindAsync(id);
@@ -40,8 +48,8 @@ namespace GamesPlatform.API.Controllers
             return user;
         }
 
-        // PUT: api/users/5
         [HttpPut("{id}")]
+        [Authorize]  // ← Редактирование — автор или админ
         public async Task<IActionResult> PutUser(int id, User user)
         {
             if (id != user.UserId)
@@ -70,8 +78,8 @@ namespace GamesPlatform.API.Controllers
             return NoContent();
         }
 
-        // POST: api/users
         [HttpPost]
+        [AllowAnonymous]  // ← Регистрация 
         public async Task<ActionResult<User>> PostUser(User user)
         {
             user.RegistrationDate = DateTime.UtcNow;
@@ -83,8 +91,8 @@ namespace GamesPlatform.API.Controllers
             return CreatedAtAction(nameof(GetUser), new { id = user.UserId }, user);
         }
 
-        // DELETE: api/users/5
         [HttpDelete("{id}")]
+        [Authorize(Roles = "Admin")]  // ← Удаление аккаунта - только админ
         public async Task<IActionResult> DeleteUser(int id)
         {
             var user = await _context.Users.FindAsync(id);

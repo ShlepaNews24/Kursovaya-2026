@@ -3,16 +3,44 @@ using GamesPlatform.API.Data;
 using Microsoft.OpenApi.Models;
 using System.Text.Json.Serialization;  
 
+// Для JWT-авторизации
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using GamesPlatform.API.Features.Auth;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
+
+// Регистрация сервиса авторизации в DI-контейнере
+builder.Services.AddScoped<IAuthService, AuthService>();
+
+// Настройка аутентификации через JWT-токены
+builder.Services.AddAuthentication("Bearer")
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new Microsoft.IdentityModel.Tokens.TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            ValidIssuer = builder.Configuration["JwtSettings:Issuer"],
+            ValidAudience = builder.Configuration["JwtSettings:Audience"],
+            IssuerSigningKey = new Microsoft.IdentityModel.Tokens.SymmetricSecurityKey(
+                System.Text.Encoding.UTF8.GetBytes(builder.Configuration["JwtSettings:SecretKey"]!))
+        };
+    });
+
+// Включение middleware аутентификации и авторизации
+builder.Services.AddAuthorization();
 
 // Настройка Entity Framework с SQLite
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 builder.Services.AddControllers()
-    .AddJsonOptions(options =>  // ← Добавить настройку JSON!
+    .AddJsonOptions(options =>
     {
         options.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
         options.JsonSerializerOptions.WriteIndented = false; 
@@ -60,6 +88,9 @@ app.UseHttpsRedirection();
 // Используем CORS
 app.UseCors("AllowAll");
 
+app.UseStaticFiles();
+
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();

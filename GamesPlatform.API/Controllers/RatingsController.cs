@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using GamesPlatform.API.Data;
 using GamesPlatform.API.Models;
+using Microsoft.AspNetCore.Authorization;
 
 namespace GamesPlatform.API.Controllers
 {
@@ -16,7 +17,6 @@ namespace GamesPlatform.API.Controllers
             _context = context;
         }
 
-        // GET: api/ratings
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Rating>>> GetRatings()
         {
@@ -26,7 +26,6 @@ namespace GamesPlatform.API.Controllers
                 .ToListAsync();
         }
 
-        // GET: api/ratings/game/5
         [HttpGet("game/{gameId}")]
         public async Task<ActionResult<IEnumerable<Rating>>> GetRatingsByGame(int gameId)
         {
@@ -36,7 +35,6 @@ namespace GamesPlatform.API.Controllers
                 .ToListAsync();
         }
 
-        // GET: api/ratings/5
         [HttpGet("{id}")]
         public async Task<ActionResult<Rating>> GetRating(int id)
         {
@@ -53,8 +51,32 @@ namespace GamesPlatform.API.Controllers
             return rating;
         }
 
-        // PUT: api/ratings/5
+        // Оценить игру
+        // Только авторизованные
+        [HttpPost]
+        [Authorize] 
+        public async Task<ActionResult<Rating>> PostRating(Rating rating)
+        {
+            // Проверяем, не оценивал ли уже пользователь эту игру
+            var existingRating = await _context.Ratings
+                .FirstOrDefaultAsync(r => r.UserId == rating.UserId && r.GameId == rating.GameId);
+
+            if (existingRating != null)
+            {
+                // Обновляем существующий рейтинг
+                existingRating.RatingValue = rating.RatingValue;
+                await _context.SaveChangesAsync();
+                return Ok(existingRating);
+            }
+
+            _context.Ratings.Add(rating);
+            await _context.SaveChangesAsync();
+
+            return CreatedAtAction(nameof(GetRating), new { id = rating.RatingId }, rating);
+        }
+
         [HttpPut("{id}")]
+        [Authorize]  // ← Изменение оценки — только для автора
         public async Task<IActionResult> PutRating(int id, Rating rating)
         {
             if (id != rating.RatingId)
@@ -83,30 +105,8 @@ namespace GamesPlatform.API.Controllers
             return NoContent();
         }
 
-        // POST: api/ratings
-        [HttpPost]
-        public async Task<ActionResult<Rating>> PostRating(Rating rating)
-        {
-            // Проверяем, не оценивал ли уже пользователь эту игру
-            var existingRating = await _context.Ratings
-                .FirstOrDefaultAsync(r => r.UserId == rating.UserId && r.GameId == rating.GameId);
-
-            if (existingRating != null)
-            {
-                // Обновляем существующий рейтинг
-                existingRating.RatingValue = rating.RatingValue;
-                await _context.SaveChangesAsync();
-                return Ok(existingRating);
-            }
-
-            _context.Ratings.Add(rating);
-            await _context.SaveChangesAsync();
-
-            return CreatedAtAction(nameof(GetRating), new { id = rating.RatingId }, rating);
-        }
-
-        // DELETE: api/ratings/5
         [HttpDelete("{id}")]
+        [Authorize(Roles = "Admin")] // ← Удаление оценки — только админ
         public async Task<IActionResult> DeleteRating(int id)
         {
             var rating = await _context.Ratings.FindAsync(id);

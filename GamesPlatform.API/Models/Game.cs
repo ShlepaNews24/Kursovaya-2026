@@ -9,6 +9,8 @@ namespace GamesPlatform.API.Models
         public DateTime ReleaseDate { get; set; }
         public DateTime ModifiedDate { get; set; } = DateTime.UtcNow;
         public string? Logo { get; set; }
+        public string? FilePath { get; set; }
+        public long? FileSize { get; set; }
 
         // Внешние ключи
         public int GenreId { get; set; }

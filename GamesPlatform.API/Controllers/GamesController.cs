@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Authorization;  
 using GamesPlatform.API.Data;
 using GamesPlatform.API.Models;
 
@@ -16,7 +17,8 @@ namespace GamesPlatform.API.Controllers
             _context = context;
         }
 
-        // GET: api/games
+        // Получить список всех игр (каталог)
+        // (ДОСТУП) Публичный — любой пользователь может просматривать игры
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Game>>> GetGames()
         {
@@ -26,7 +28,8 @@ namespace GamesPlatform.API.Controllers
                 .ToListAsync();
         }
 
-        // GET: api/games/5
+        // Получить игру по ID (страница игры)
+        // (ДОСТУП) Публичный — любой пользователь может смотреть детали
         [HttpGet("{id}")]
         public async Task<ActionResult<Game>> GetGame(int id)
         {
@@ -45,8 +48,25 @@ namespace GamesPlatform.API.Controllers
             return game;
         }
 
-        // PUT: api/games/5
+        // Создать новую игру (загрузить свою игру)
+        // Только авторизованные пользователи 
+        // 
+        [HttpPost]
+        [Authorize]  // ←  Защита: только вошедшие пользователи
+        public async Task<ActionResult<Game>> PostGame(Game game)
+        {
+            game.ModifiedDate = DateTime.UtcNow;
+            
+            _context.Games.Add(game);
+            await _context.SaveChangesAsync();
+
+            return CreatedAtAction(nameof(GetGame), new { id = game.GameId }, game);
+        }
+
+        // Обновить существующую игру
+        // Только авторизованные — редактировать могут только создатели
         [HttpPut("{id}")]
+        [Authorize]  // ← Защита от несанкционированного редактирования
         public async Task<IActionResult> PutGame(int id, Game game)
         {
             if (id != game.GameId)
@@ -77,20 +97,10 @@ namespace GamesPlatform.API.Controllers
             return NoContent();
         }
 
-        // POST: api/games
-        [HttpPost]
-        public async Task<ActionResult<Game>> PostGame(Game game)
-        {
-            game.ModifiedDate = DateTime.UtcNow;
-            
-            _context.Games.Add(game);
-            await _context.SaveChangesAsync();
-
-            return CreatedAtAction(nameof(GetGame), new { id = game.GameId }, game);
-        }
-
-        // DELETE: api/games/5
+        // Удалить игру (модерация)
+        // Только администраторы — обычные пользователи не могут удалять
         [HttpDelete("{id}")]
+        [Authorize(Roles = "Admin")]  // ← Строгая защита: только админы
         public async Task<IActionResult> DeleteGame(int id)
         {
             var game = await _context.Games.FindAsync(id);
@@ -105,6 +115,7 @@ namespace GamesPlatform.API.Controllers
             return NoContent();
         }
 
+        // Вспомогательный метод проверки существования игры
         private bool GameExists(int id)
         {
             return _context.Games.Any(e => e.GameId == id);
