@@ -1,25 +1,39 @@
-using System.Collections.Generic;  
+// [ФАЙЛ] GamesPlatform.API/Models/Game.cs
+
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace GamesPlatform.API.Models
 {
     public class Game
     {
+        [Key]
         public int GameId { get; set; }
+        
+        [Required, MaxLength(200)]
         public string GameTitle { get; set; } = string.Empty;
+        
+        // ✅ Новое поле
+        public string? Description { get; set; }
+        
         public DateTime ReleaseDate { get; set; }
         public DateTime ModifiedDate { get; set; } = DateTime.UtcNow;
+        
         public string? Logo { get; set; }
-        public string? FilePath { get; set; }
-        public long? FileSize { get; set; }
-
-        // Внешние ключи
+        
         public int GenreId { get; set; }
         public int DeveloperId { get; set; }
-
-        // Навигационные свойства
-        public Genre? Genre { get; set; }  
-        public User? Developer { get; set; } 
-        public ICollection<Comment> Comments { get; set; } = new List<Comment>();
-        public ICollection<Rating> Ratings { get; set; } = new List<Rating>();
+        
+        [Required, MaxLength(500)]
+        public string GameUrl { get; set; } = string.Empty;
+        
+        [ForeignKey("GenreId")]
+        public Genre? Genre { get; set; }
+        
+        [ForeignKey("DeveloperId")]
+        public User? Developer { get; set; }
+        
+        public ICollection<Comment>? Comments { get; set; } = new List<Comment>();
+        public ICollection<Rating>? Ratings { get; set; } = new List<Rating>();
     }
 }

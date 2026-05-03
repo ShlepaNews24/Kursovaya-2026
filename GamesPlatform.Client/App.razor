@@ -1,0 +1,19 @@
+﻿@* Root component: simple routing without built-in auth *@
+@using GamesPlatform.Client.Shared
+
+<Router AppAssembly="@typeof(Program).Assembly">
+    <Found Context="routeData">
+        <!-- ✅ Используем обычный RouteView вместо AuthorizeRouteView -->
+        <RouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)" />
+        <FocusOnNavigate RouteData="@routeData" Selector="h1" />
+    </Found>
+    <NotFound>
+        <PageTitle><span>Not Found</span></PageTitle>
+        <LayoutView Layout="@typeof(MainLayout)">
+            <div class="alert alert-warning">
+                <h4><span>Page not found</span></h4>
+                <a href="/" class="btn btn-primary"><span>Go to home</span></a>
+            </div>
+        </LayoutView>
+    </NotFound>
+</Router>

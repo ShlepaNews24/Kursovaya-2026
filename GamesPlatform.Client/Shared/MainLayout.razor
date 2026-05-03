@@ -1,0 +1,57 @@
+@inherits LayoutComponentBase
+@inject IAuthService AuthService
+@inject INotificationService Notify
+
+<div class="page">
+    <div class="sidebar">
+        <NavMenu IsAuthenticated="@isAuthenticated" UserRole="@userRole" />
+    </div>
+
+    <main>
+        <div class="top-row px-4">
+            @if (isAuthenticated)
+            {
+                <span><span>👤</span> <span>@(userRole == "Admin" ? "Admin" : "User")</span></span>
+                <button class="btn btn-outline-danger btn-sm ms-2" @onclick="HandleLogout"><span>Logout</span></button>
+            }
+            else
+            {
+                <a href="/login" class="btn btn-outline-primary btn-sm"><span>Login</span></a>
+                <a href="/register" class="btn btn-primary btn-sm ms-2"><span>Register</span></a>
+            }
+        </div>
+
+        <article class="content px-4">
+            @Body
+        </article>
+    </main>
+    
+    <ToastNotification />
+</div>
+
+@code {
+    private bool isAuthenticated = false;
+    private string? userRole;
+
+    private void OnNotificationReceived(string message, string type) => StateHasChanged();
+
+    protected override async Task OnInitializedAsync()
+    {
+        isAuthenticated = await AuthService.IsAuthenticatedAsync();
+        userRole = await AuthService.GetUserRoleAsync();
+        Notify.OnNotify += OnNotificationReceived;
+    }
+
+    private async Task HandleLogout()
+    {
+        await AuthService.LogoutAsync();
+        isAuthenticated = false;
+        userRole = null;
+        StateHasChanged();
+    }
+
+    public void Dispose()
+    {
+        Notify.OnNotify -= OnNotificationReceived;
+    }
+}

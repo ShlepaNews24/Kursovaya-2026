@@ -1,8 +1,12 @@
+// [НАЗНАЧЕНИЕ] Контроллер для работы с оценками игр
+// [ФАЙЛ] Controllers/RatingsController.cs
+
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 using GamesPlatform.API.Data;
 using GamesPlatform.API.Models;
-using Microsoft.AspNetCore.Authorization;
 
 namespace GamesPlatform.API.Controllers
 {
@@ -17,113 +21,115 @@ namespace GamesPlatform.API.Controllers
             _context = context;
         }
 
-        [HttpGet]
-        public async Task<ActionResult<IEnumerable<Rating>>> GetRatings()
-        {
-            return await _context.Ratings
-                .Include(r => r.User)
-                .Include(r => r.Game)
-                .ToListAsync();
-        }
-
+        // ====================================================================
+        // [НАЗНАЧЕНИЕ] Получение сводки рейтинга для игры
+        // [МАРШРУТ] GET /api/ratings/game/{gameId}
+        // [ВОЗВРАЩАЕТ] Средний рейтинг, количество голосов и оценку текущего пользователя
+        // ====================================================================
         [HttpGet("game/{gameId}")]
-        public async Task<ActionResult<IEnumerable<Rating>>> GetRatingsByGame(int gameId)
+        public async Task<ActionResult<RatingSummaryDto>> GetGameRating(int gameId)
         {
-            return await _context.Ratings
+            var gameExists = await _context.Games.AnyAsync(g => g.GameId == gameId);
+            if (!gameExists) return NotFound("Игра не найдена");
+
+            // Подсчёт среднего и количества
+            var ratings = await _context.Ratings
                 .Where(r => r.GameId == gameId)
-                .Include(r => r.User)
                 .ToListAsync();
-        }
 
-        [HttpGet("{id}")]
-        public async Task<ActionResult<Rating>> GetRating(int id)
-        {
-            var rating = await _context.Ratings
-                .Include(r => r.User)
-                .Include(r => r.Game)
-                .FirstOrDefaultAsync(r => r.RatingId == id);
+            double average = ratings.Any() ? ratings.Average(r => r.RatingValue) : 0;
+            int count = ratings.Count;
 
-            if (rating == null)
+            // Оценка текущего пользователя (если авторизован)
+            int? userRating = null;
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+            if (userIdClaim != null && int.TryParse(userIdClaim.Value, out var userId))
             {
-                return NotFound();
+                userRating = ratings.FirstOrDefault(r => r.UserId == userId)?.RatingValue;
             }
 
-            return rating;
+            return new RatingSummaryDto
+            {
+                GameId = gameId,
+                AverageRating = Math.Round(average, 1),
+                TotalVotes = count,
+                UserRating = userRating
+            };
         }
 
-        // Оценить игру
-        // Только авторизованные
+        // ====================================================================
+        // [НАЗНАЧЕНИЕ] Добавление или обновление оценки
+        // [МАРШРУТ] POST /api/ratings
+        // [ДОСТУП] Только авторизованные пользователи
+        // [ОСОБЕННОСТЬ] Если оценка уже есть — обновляет её
+        // ====================================================================
         [HttpPost]
-        [Authorize] 
-        public async Task<ActionResult<Rating>> PostRating(Rating rating)
+        [Authorize]
+        public async Task<ActionResult<RatingSummaryDto>> PostRating(RatingDto dto)
         {
-            // Проверяем, не оценивал ли уже пользователь эту игру
-            var existingRating = await _context.Ratings
-                .FirstOrDefaultAsync(r => r.UserId == rating.UserId && r.GameId == rating.GameId);
+            if (dto.RatingValue < 1 || dto.RatingValue > 5)
+                return BadRequest("Оценка должна быть от 1 до 5");
 
-            if (existingRating != null)
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+            if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out var userId))
+                return Unauthorized("Не удалось определить пользователя");
+
+            var gameExists = await _context.Games.AnyAsync(g => g.GameId == dto.GameId);
+            if (!gameExists) return BadRequest("Игра не найдена");
+
+            // Проверка существующей оценки
+            var existing = await _context.Ratings
+                .FirstOrDefaultAsync(r => r.GameId == dto.GameId && r.UserId == userId);
+
+            if (existing != null)
             {
-                // Обновляем существующий рейтинг
-                existingRating.RatingValue = rating.RatingValue;
-                await _context.SaveChangesAsync();
-                return Ok(existingRating);
+                // Обновляем оценку
+                existing.RatingValue = dto.RatingValue;
+            }
+            else
+            {
+                // Создаём новую
+                _context.Ratings.Add(new Rating
+                {
+                    GameId = dto.GameId,
+                    UserId = userId,
+                    RatingValue = dto.RatingValue
+                });
             }
 
-            _context.Ratings.Add(rating);
             await _context.SaveChangesAsync();
 
-            return CreatedAtAction(nameof(GetRating), new { id = rating.RatingId }, rating);
-        }
+            // Возвращаем обновлённую сводку
+            var ratings = await _context.Ratings.Where(r => r.GameId == dto.GameId).ToListAsync();
+            double average = ratings.Any() ? ratings.Average(r => r.RatingValue) : 0;
 
-        [HttpPut("{id}")]
-        [Authorize]  // ← Изменение оценки — только для автора
-        public async Task<IActionResult> PutRating(int id, Rating rating)
-        {
-            if (id != rating.RatingId)
+            return Ok(new RatingSummaryDto
             {
-                return BadRequest();
-            }
-
-            _context.Entry(rating).State = EntityState.Modified;
-
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!RatingExists(id))
-                {
-                    return NotFound();
-                }
-                else
-                {
-                    throw;
-                }
-            }
-
-            return NoContent();
+                GameId = dto.GameId,
+                AverageRating = Math.Round(average, 1),
+                TotalVotes = ratings.Count,
+                UserRating = dto.RatingValue
+            });
         }
+    }
 
-        [HttpDelete("{id}")]
-        [Authorize(Roles = "Admin")] // ← Удаление оценки — только админ
-        public async Task<IActionResult> DeleteRating(int id)
-        {
-            var rating = await _context.Ratings.FindAsync(id);
-            if (rating == null)
-            {
-                return NotFound();
-            }
+    // ========================================================================
+    // [НАЗНАЧЕНИЕ] DTO для передачи сводки рейтинга
+    // ========================================================================
+    public class RatingSummaryDto
+    {
+        public int GameId { get; set; }
+        public double AverageRating { get; set; }
+        public int TotalVotes { get; set; }
+        public int? UserRating { get; set; }
+    }
 
-            _context.Ratings.Remove(rating);
-            await _context.SaveChangesAsync();
-
-            return NoContent();
-        }
-
-        private bool RatingExists(int id)
-        {
-            return _context.Ratings.Any(e => e.RatingId == id);
-        }
+    // ========================================================================
+    // [НАЗНАЧЕНИЕ] DTO для отправки оценки
+    // ========================================================================
+    public class RatingDto
+    {
+        public int GameId { get; set; }
+        public int RatingValue { get; set; }
     }
 }

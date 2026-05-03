@@ -1,8 +1,10 @@
+// [НАЗНАЧЕНИЕ] Контроллер комментариев с загрузкой имени пользователя
+// [ФАЙЛ] Controllers/CommentsController.cs
+
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using GamesPlatform.API.Data;
 using GamesPlatform.API.Models;
-using Microsoft.AspNetCore.Authorization; 
 
 namespace GamesPlatform.API.Controllers
 {
@@ -17,106 +19,92 @@ namespace GamesPlatform.API.Controllers
             _context = context;
         }
 
-        [HttpGet]
-        public async Task<ActionResult<IEnumerable<Comment>>> GetComments()
-        {
-            return await _context.Comments
-                .Include(c => c.User)
-                .Include(c => c.Game)
-                .ToListAsync();
-        }
-
+        // ====================================================================
+        // [НАЗНАЧЕНИЕ] Получение комментариев для игры
+        // [ИСПРАВЛЕНО] Добавлен .Include(c => c.User) для загрузки ника
+        // ====================================================================
         [HttpGet("game/{gameId}")]
-        public async Task<ActionResult<IEnumerable<Comment>>> GetCommentsByGame(int gameId)
+        public async Task<ActionResult<IEnumerable<CommentDto>>> GetCommentsByGame(int gameId)
         {
-            return await _context.Comments
+            var comments = await _context.Comments
+                .Include(c => c.User) // ✅ Загружаем связанного пользователя
                 .Where(c => c.GameId == gameId)
-                .Include(c => c.User)
+                .OrderByDescending(c => c.CreatedDate)
+                .Select(c => new CommentDto
+                {
+                    CommentId = c.CommentId,
+                    CommentText = c.CommentText,
+                    CreatedDate = c.CreatedDate,
+                    UserId = c.UserId,
+                    GameId = c.GameId,
+                    UserName = c.User != null ? c.User.UserName : null // ✅ Заполняем UserName
+                })
                 .ToListAsync();
+
+            return comments;
         }
 
-        [HttpGet("{id}")]
-        public async Task<ActionResult<Comment>> GetComment(int id)
-        {
-            var comment = await _context.Comments
-                .Include(c => c.User)
-                .Include(c => c.Game)
-                .FirstOrDefaultAsync(c => c.CommentId == id);
-
-            if (comment == null)
-            {
-                return NotFound();
-            }
-
-            return comment;
-        }
-
-        // Оставить комментарий к игре
-        // Только авторизованные 
+        // ====================================================================
+        // [НАЗНАЧЕНИЕ] Добавление комментария
+        // ====================================================================
         [HttpPost]
-        [Authorize]  // ← Защита: комментировать могут только вошедшие
-        public async Task<ActionResult<Comment>> PostComment(Comment comment)
+        public async Task<ActionResult<CommentDto>> PostComment(Comment comment)
         {
+            if (string.IsNullOrWhiteSpace(comment.CommentText))
+                return BadRequest("Текст комментария не может быть пустым");
+
+            // Проверка существования пользователя и игры
+            var userExists = await _context.Users.AnyAsync(u => u.UserId == comment.UserId);
+            if (!userExists) return BadRequest("Пользователь не найден");
+
+            var gameExists = await _context.Games.AnyAsync(g => g.GameId == comment.GameId);
+            if (!gameExists) return BadRequest("Игра не найдена");
+
             comment.CreatedDate = DateTime.UtcNow;
-            
+
             _context.Comments.Add(comment);
             await _context.SaveChangesAsync();
 
-            return CreatedAtAction(nameof(GetComment), new { id = comment.CommentId }, comment);
+            // Возвращаем DTO с заполненным UserName
+            var user = await _context.Users.FindAsync(comment.UserId);
+            
+            return CreatedAtAction(nameof(GetCommentsByGame), new { gameId = comment.GameId }, new CommentDto
+            {
+                CommentId = comment.CommentId,
+                CommentText = comment.CommentText,
+                CreatedDate = comment.CreatedDate,
+                UserId = comment.UserId,
+                GameId = comment.GameId,
+                UserName = user?.UserName
+            });
         }
 
-        // Редактировать свой комментарий
-        [HttpPut("{id}")]
-        [Authorize]  // ← Защита от редактирования чужих комментариев
-        public async Task<IActionResult> PutComment(int id, Comment comment)
-        {
-            if (id != comment.CommentId)
-            {
-                return BadRequest();
-            }
-
-            _context.Entry(comment).State = EntityState.Modified;
-
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!CommentExists(id))
-                {
-                    return NotFound();
-                }
-                else
-                {
-                    throw;
-                }
-            }
-
-            return NoContent();
-        }
-
-        // Удалить комментарий (модерация)
-        // Только администраторы — обычные пользователи удаляют только свои
+        // ====================================================================
+        // [НАЗНАЧЕНИЕ] Удаление комментария
+        // ====================================================================
         [HttpDelete("{id}")]
-        [Authorize(Roles = "Admin")]  // ← Удаление — привилегия админа
         public async Task<IActionResult> DeleteComment(int id)
         {
             var comment = await _context.Comments.FindAsync(id);
-            if (comment == null)
-            {
-                return NotFound();
-            }
+            if (comment == null) return NotFound();
 
             _context.Comments.Remove(comment);
             await _context.SaveChangesAsync();
 
             return NoContent();
         }
+    }
 
-        private bool CommentExists(int id)
-        {
-            return _context.Comments.Any(e => e.CommentId == id);
-        }
+    // ========================================================================
+    // [НАЗНАЧЕНИЕ] DTO для передачи комментария клиенту
+    // ========================================================================
+    public class CommentDto
+    {
+        public int CommentId { get; set; }
+        public string CommentText { get; set; } = string.Empty;
+        public DateTime CreatedDate { get; set; }
+        public int UserId { get; set; }
+        public int GameId { get; set; }
+        public string? UserName { get; set; } // ✅ Поле для ника
     }
 }

@@ -1,6 +1,9 @@
+// [ФАЙЛ] GamesPlatform.API/Controllers/GamesController.cs
+
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.AspNetCore.Authorization;  
+using System.Security.Claims;
 using GamesPlatform.API.Data;
 using GamesPlatform.API.Models;
 
@@ -12,13 +15,8 @@ namespace GamesPlatform.API.Controllers
     {
         private readonly AppDbContext _context;
 
-        public GamesController(AppDbContext context)
-        {
-            _context = context;
-        }
+        public GamesController(AppDbContext context) => _context = context;
 
-        // Получить список всех игр (каталог)
-        // (ДОСТУП) Публичный — любой пользователь может просматривать игры
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Game>>> GetGames()
         {
@@ -28,33 +26,41 @@ namespace GamesPlatform.API.Controllers
                 .ToListAsync();
         }
 
-        // Получить игру по ID (страница игры)
-        // (ДОСТУП) Публичный — любой пользователь может смотреть детали
         [HttpGet("{id}")]
         public async Task<ActionResult<Game>> GetGame(int id)
         {
             var game = await _context.Games
                 .Include(g => g.Genre)
                 .Include(g => g.Developer)
-                .Include(g => g.Comments)
-                .Include(g => g.Ratings)
                 .FirstOrDefaultAsync(g => g.GameId == id);
-
-            if (game == null)
-            {
-                return NotFound();
-            }
-
+            
+            if (game == null) return NotFound();
             return game;
         }
 
-        // Создать новую игру (загрузить свою игру)
-        // Только авторизованные пользователи 
-        // 
         [HttpPost]
-        [Authorize]  // ←  Защита: только вошедшие пользователи
+        [Authorize]
         public async Task<ActionResult<Game>> PostGame(Game game)
         {
+            if (string.IsNullOrWhiteSpace(game.GameTitle))
+                return BadRequest("Game title is required");
+            
+            if (string.IsNullOrWhiteSpace(game.GameUrl))
+                return BadRequest("Game URL is required");
+            
+            if (!Uri.IsWellFormedUriString(game.GameUrl, UriKind.Absolute))
+                return BadRequest("Invalid URL format");
+            
+            // Безопасность: DeveloperId из токена
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+            if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out var userId))
+                return Unauthorized("Invalid token");
+            
+            game.DeveloperId = userId;
+            
+            var genreExists = await _context.Genres.AnyAsync(g => g.GenreId == game.GenreId);
+            if (!genreExists) return BadRequest("Genre not found");
+            
             game.ModifiedDate = DateTime.UtcNow;
             
             _context.Games.Add(game);
@@ -63,62 +69,39 @@ namespace GamesPlatform.API.Controllers
             return CreatedAtAction(nameof(GetGame), new { id = game.GameId }, game);
         }
 
-        // Обновить существующую игру
-        // Только авторизованные — редактировать могут только создатели
         [HttpPut("{id}")]
-        [Authorize]  // ← Защита от несанкционированного редактирования
+        [Authorize]
         public async Task<IActionResult> PutGame(int id, Game game)
         {
-            if (id != game.GameId)
-            {
-                return BadRequest();
-            }
-
-            game.ModifiedDate = DateTime.UtcNow;
-
-            _context.Entry(game).State = EntityState.Modified;
-
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!GameExists(id))
-                {
-                    return NotFound();
-                }
-                else
-                {
-                    throw;
-                }
-            }
-
+            if (id != game.GameId) return BadRequest();
+            
+            if (!Uri.IsWellFormedUriString(game.GameUrl, UriKind.Absolute))
+                return BadRequest("Invalid URL format");
+            
+            var existing = await _context.Games.FindAsync(id);
+            if (existing == null) return NotFound();
+            
+            existing.GameTitle = game.GameTitle;
+            existing.Description = game.Description; // ✅ Обновляем описание
+            existing.GameUrl = game.GameUrl;
+            existing.ReleaseDate = game.ReleaseDate;
+            existing.GenreId = game.GenreId;
+            existing.ModifiedDate = DateTime.UtcNow;
+            
+            await _context.SaveChangesAsync();
             return NoContent();
         }
 
-        // Удалить игру (модерация)
-        // Только администраторы — обычные пользователи не могут удалять
         [HttpDelete("{id}")]
-        [Authorize(Roles = "Admin")]  // ← Строгая защита: только админы
+        [Authorize]
         public async Task<IActionResult> DeleteGame(int id)
         {
             var game = await _context.Games.FindAsync(id);
-            if (game == null)
-            {
-                return NotFound();
-            }
-
+            if (game == null) return NotFound();
+            
             _context.Games.Remove(game);
             await _context.SaveChangesAsync();
-
             return NoContent();
-        }
-
-        // Вспомогательный метод проверки существования игры
-        private bool GameExists(int id)
-        {
-            return _context.Games.Any(e => e.GameId == id);
         }
     }
 }

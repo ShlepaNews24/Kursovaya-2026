@@ -1,0 +1,151 @@
+@page "/games/create"
+@inject IGamesService GamesService
+@inject GenreService GenreService
+@inject IAuthService AuthService
+@inject NavigationManager Nav
+@inject INotificationService Notify
+
+<PageTitle><span>Add Game</span></PageTitle>
+
+<h3><span>Add New Game</span></h3>
+
+@if (!isAuthenticated)
+{
+    <div class="alert alert-warning"><span>Login to add a game.</span></div>
+}
+else
+{
+    <div class="card" style="max-width: 700px;">
+        <div class="card-body">
+            <form @onsubmit="HandleCreate">
+                <div class="mb-3">
+                    <label class="form-label"><span>Game Title</span></label>
+                    <input type="text" class="form-control" @bind="game.GameTitle" required placeholder="Super HTML5 Game" />
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label"><span>Cover Image URL (Logo)</span></label>
+                    <!-- ✅ НОВОЕ ПОЛЕ ДЛЯ ОБЛОЖКИ -->
+                    <input type="url" class="form-control" @bind="game.Logo" 
+                           placeholder="https://example.com/cover.jpg" />
+                    <small class="text-muted"><span>Link to a .jpg or .png image (optional)</span></small>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label"><span>Game URL</span></label>
+                    <input type="url" class="form-control" @bind="game.GameUrl" required 
+                           placeholder="https://example.com/game.html" />
+                    <small class="text-muted"><span>Link to the HTML5 game file</span></small>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label"><span>Description</span></label>
+                    <textarea class="form-control" @bind="game.Description" rows="3" 
+                              placeholder="Enter game description (optional)"></textarea>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label"><span>Genre</span></label>
+                    @if (genres == null)
+                    {
+                        <span class="text-muted"><span>Loading genres...</span></span>
+                    }
+                    else
+                    {
+                        <select class="form-select" @bind="game.GenreId" required>
+                            <option value="">-- Select Genre --</option>
+                            @foreach (var g in genres)
+                            {
+                                <option value="@g.GenreId">@g.GenreName</option>
+                            }
+                        </select>
+                    }
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label"><span>Release Date</span></label>
+                    <input type="date" class="form-control" @bind="game.ReleaseDate" required />
+                </div>
+
+                <button type="submit" class="btn btn-success w-100" 
+                        disabled="@(isLoading || string.IsNullOrWhiteSpace(game.GameTitle) || string.IsNullOrWhiteSpace(game.GameUrl) || genres == null)">
+                    @if (isLoading) 
+                    { 
+                        <span class="spinner-border spinner-border-sm"></span> <span>Creating...</span> 
+                    }
+                    else 
+                    { 
+                        <span>Create Game</span> 
+                    }
+                </button>
+                
+                <a href="/games" class="btn btn-link w-100 mt-2"><span>Cancel</span></a>
+            </form>
+        </div>
+    </div>
+}
+
+@code {
+    private bool isAuthenticated = false;
+    private bool isLoading = false;
+    private List<GenreDto>? genres;
+    
+    private GameDto game = new GameDto 
+    { 
+        ReleaseDate = DateTime.UtcNow,
+        GameUrl = "",
+        Description = "",
+        Logo = "" // Инициализация пустой строкой
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        isAuthenticated = await AuthService.IsAuthenticatedAsync();
+        
+        if (isAuthenticated)
+        {
+            genres = await GenreService.GetGenresAsync();
+            
+            var userIdStr = await AuthService.GetUserIdAsync();
+            if (!string.IsNullOrEmpty(userIdStr) && int.TryParse(userIdStr, out var userId))
+            {
+                game.DeveloperId = userId;
+            }
+        }
+    }
+
+    private async Task HandleCreate()
+    {
+        if (string.IsNullOrWhiteSpace(game.GameTitle))
+        {
+            Notify.Show("Enter game title", "error");
+            return;
+        }
+        
+        if (string.IsNullOrWhiteSpace(game.GameUrl) || !Uri.IsWellFormedUriString(game.GameUrl, UriKind.Absolute))
+        {
+            Notify.Show("Enter valid game URL", "error");
+            return;
+        }
+        
+        if (game.GenreId <= 0)
+        {
+            Notify.Show("Select a genre", "error");
+            return;
+        }
+
+        isLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            var success = await GamesService.CreateGameAsync(game);
+            if (success) Nav.NavigateTo("/games");
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+}

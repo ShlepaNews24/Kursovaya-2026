@@ -1,0 +1,251 @@
+@page "/game/{Id:int}"
+@inject IGamesService GamesService
+@inject IAuthService AuthService
+@inject INotificationService Notify
+
+<PageTitle>@(game?.GameTitle ?? "Game")</PageTitle>
+
+@if (isLoading) 
+{ 
+    <div class="text-center py-5">
+        <div class="spinner-border text-primary" role="status"></div>
+        <p class="mt-2"><span>Loading...</span></p>
+    </div>
+}
+else if (game == null) 
+{ 
+    <div class="alert alert-danger"><span>Game not found</span></div> 
+}
+else
+{
+    @* Обложка *@
+    @if (!string.IsNullOrEmpty(game.Logo))
+    {
+        <div class="mb-4">
+            <img src="@game.Logo" 
+                 class="img-fluid rounded shadow" 
+                 style="max-height: 400px; width: 100%; object-fit: cover;" 
+                 alt="@game.GameTitle" />
+        </div>
+    }
+
+    <h3><span>@game.GameTitle</span></h3>
+    
+    @* Описание *@
+    @if (!string.IsNullOrWhiteSpace(game.Description))
+    {
+        <div class="alert alert-secondary mb-3">
+            <span>@game.Description</span>
+        </div>
+    }
+    
+    <p class="text-muted"><span>@game.ReleaseDate.ToShortDateString()</span></p>
+    
+    @* Рейтинг *@
+    @if (rating != null)
+    {
+        <div class="mb-3">
+            <span class="me-2">
+                @for (int i = 1; i <= 5; i++)
+                {
+                    <span style="color: @(i <= rating.AverageRating ? "#ffc107" : "#ddd"); font-size: 1.2rem;">★</span>
+                }
+            </span>
+            <span class="text-muted"><span>@rating.AverageRating (@rating.TotalVotes votes)</span></span>
+        </div>
+    }
+    
+    @* Iframe с игрой *@
+    <div class="card mb-4">
+        <div class="card-header"><h5><span>Play Game</span></h5></div>
+        <div class="card-body">
+            @if (!string.IsNullOrEmpty(game.GameUrl))
+            {
+                <div class="ratio ratio-16x9 mb-3" style="background: #000; border-radius: 8px; overflow: hidden;">
+                    @* ✅ ИСПРАВЛЕНО: Добавлен allow-popups *@
+                    <iframe src="@game.GameUrl" 
+                            sandbox="allow-scripts allow-same-origin allow-pointer-lock allow-forms allow-popups"
+                            style="border: none; width: 100%; height: 100%;"
+                            title="@game.GameTitle"
+                            loading="lazy">
+                    </iframe>
+                </div>
+                <div class="alert alert-success d-flex align-items-center">
+                    <span class="me-2"><span>Game loaded</span></span>
+                    <a href="@game.GameUrl" 
+                       class="btn btn-outline-primary btn-sm" 
+                       target="_blank" 
+                       rel="noopener noreferrer">
+                        <span>Open in new tab</span>
+                    </a>
+                </div>
+            }
+            else
+            {
+                <div class="alert alert-warning"><span>No game URL provided.</span></div>
+            }
+        </div>
+    </div>
+
+    @* Оценка *@
+    <div class="card mb-4">
+        <div class="card-header"><h5><span>Rate this Game</span></h5></div>
+        <div class="card-body">
+            @if (isAuthenticated)
+            {
+                <div class="d-flex align-items-center">
+                    <span class="me-2"><span>Your rating:</span></span>
+                    @for (int i = 1; i <= 5; i++)
+                    {
+                        var star = i;
+                        <button class="btn btn-link p-0 me-1" 
+                                @onclick="() => SubmitRating(star)" 
+                                disabled="@(isRating)">
+                            <span style="color: @(i <= userRatingValue ? "#ffc107" : "#ddd"); font-size: 1.5rem;">
+                                @(i <= userRatingValue ? "★" : "☆")
+                            </span>
+                        </button>
+                    }
+                    @if (isRating)
+                    {
+                        <span class="spinner-border spinner-border-sm ms-2" role="status"></span>
+                    }
+                </div>
+            }
+            else
+            {
+                <p class="mb-0"><span><a href="/login"><span>Login</span></a> to rate this game.</span></p>
+            }
+        </div>
+    </div>
+
+    @* Комментарии *@
+    <div class="card mb-4">
+        <div class="card-header"><h5><span>Comments (@(comments?.Count ?? 0))</span></h5></div>
+        <div class="card-body">
+            @if (comments?.Any() == true)
+            {
+                <ul class="list-group mb-3">
+                    @foreach (var c in comments)
+                    {
+                        <li class="list-group-item">
+                            <strong><span>@(c.UserName ?? $"User {c.UserId}")</span></strong>: <span>@c.CommentText</span>
+                            <small class="text-muted d-block"><span>@c.CreatedDate.ToShortDateString()</span></small>
+                        </li>
+                    }
+                </ul>
+            }
+            else 
+            { <p class="text-muted mb-3"><span>No comments yet.</span></p> }
+
+            @if (isAuthenticated)
+            {
+                <div class="input-group">
+                    <textarea class="form-control" @bind="newComment" placeholder="Write a comment..." rows="2" maxlength="500"></textarea>
+                    <button class="btn btn-primary" @onclick="AddComment" disabled="@(string.IsNullOrWhiteSpace(newComment))">
+                        <span>Send</span>
+                    </button>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+    
+    private GameDto? game;
+    private List<CommentDto>? comments = new();
+    private RatingSummaryDto? rating;
+    private string newComment = "";
+    private bool isLoading = true;
+    private bool isAuthenticated = false;
+    private bool isRating = false;
+    private int userRatingValue = 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        isLoading = true;
+        StateHasChanged();
+        
+        try
+        {
+            game = await GamesService.GetGameAsync(Id);
+            comments = await GamesService.GetCommentsAsync(Id) ?? new();
+            rating = await GamesService.GetRatingAsync(Id);
+            isAuthenticated = await AuthService.IsAuthenticatedAsync();
+            
+            if (rating?.UserRating != null)
+                userRatingValue = rating.UserRating.Value;
+        }
+        catch (Exception ex)
+        {
+            Notify.Show($"Error loading game: {ex.Message}", "error");
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task SubmitRating(int value)
+    {
+        if (isRating) return;
+        
+        isRating = true;
+        StateHasChanged();
+        
+        try
+        {
+            var result = await GamesService.AddRatingAsync(Id, value);
+            if (result != null)
+            {
+                rating = result;
+                userRatingValue = value;
+            }
+        }
+        finally
+        {
+            isRating = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task AddComment()
+    {
+        if (string.IsNullOrWhiteSpace(newComment)) return;
+        
+        var userIdStr = await AuthService.GetUserIdAsync();
+        
+        if (string.IsNullOrEmpty(userIdStr) || !int.TryParse(userIdStr, out var userId))
+        {
+            Notify.Show("Error: user not identified. Please re-login.", "error");
+            return;
+        }
+        
+        var success = await GamesService.AddCommentAsync(new CommentDto 
+        { 
+            GameId = Id, 
+            UserId = userId, 
+            CommentText = newComment.Trim(), 
+            CreatedDate = DateTime.UtcNow 
+        });
+        
+        if (success) 
+        { 
+            var userName = await AuthService.GetUserNameAsync() ?? "You";
+            
+            comments?.Add(new CommentDto 
+            { 
+                CommentText = newComment.Trim(), 
+                UserId = userId, 
+                CreatedDate = DateTime.UtcNow,
+                UserName = userName 
+            }); 
+            
+            newComment = ""; 
+            StateHasChanged(); 
+        }
+    }
+}
