@@ -1,13 +1,7 @@
-// [НАЗНАЧЕНИЕ] DTO для авторизации на сервере
-// [ФАЙЛ] GamesPlatform.API/Features/Auth/AuthDtos.cs
-
 using System.ComponentModel.DataAnnotations;
 
 namespace GamesPlatform.API.Features.Auth
 {
-    // ========================================================================
-    // [НАЗНАЧЕНИЕ] Данные для регистрации
-    // ========================================================================
     public class RegisterDto
     {
         [Required, MinLength(3), MaxLength(50)]
@@ -20,9 +14,6 @@ namespace GamesPlatform.API.Features.Auth
         public string Password { get; set; } = string.Empty;
     }
 
-    // ========================================================================
-    // [НАЗНАЧЕНИЕ] Данные для входа
-    // ========================================================================
     public class LoginDto
     {
         [Required, EmailAddress]
@@ -32,24 +23,24 @@ namespace GamesPlatform.API.Features.Auth
         public string Password { get; set; } = string.Empty;
     }
 
-    // ========================================================================
-    // [НАЗНАЧЕНИЕ] Ответ сервера после авторизации
-    // [ВАЖНО] Содержит все данные пользователя для клиента
-    // ========================================================================
     public class AuthResponseDto
     {
         public string Token { get; set; } = string.Empty;
         public DateTime ExpiresAt { get; set; }
         public string UserType { get; set; } = string.Empty;
-        
-        // ✅ ID и Ник обязательны для работы профиля и комментариев
         public string UserId { get; set; } = string.Empty;
         public string UserName { get; set; } = string.Empty;
+        
+        public DateTime RegistrationDate { get; set; }
+        public DateTime? LastLoginDate { get; set; }
+        public DateTime? DateOfBirth { get; set; }
     }
 
-    // ========================================================================
-    // [НАЗНАЧЕНИЕ] Ответ при ошибке
-    // ========================================================================
+    public class UpdateDateOfBirthDto
+    {
+        public DateTime? DateOfBirth { get; set; }
+    }
+
     public class AuthErrorDto
     {
         public string Message { get; set; } = string.Empty;

@@ -1,14 +1,9 @@
-// [НАЗНАЧЕНИЕ] Классы данных для обмена с серверным API
-// [ФАЙЛ] GamesPlatform.Client/Models/Dtos.cs
-// [ОБНОВЛЕНО] Добавлено Description, RatingSummaryDto. Удалены файловые поля.
-
+// Классы данных для обмена с серверным API
 using System.Text.Json.Serialization;
 
 namespace GamesPlatform.Client.Models
 {
-    // ========================================================================
-    // [НАЗНАЧЕНИЕ] Запрос авторизации
-    // ========================================================================
+    // Запрос авторизации
     public class AuthRequestDto
     {
         public string? UserName { get; set; }
@@ -16,10 +11,7 @@ namespace GamesPlatform.Client.Models
         public string Password { get; set; } = string.Empty;
     }
 
-    // ========================================================================
-    // [НАЗНАЧЕНИЕ] Ответ сервера после авторизации
-    // [ВАЖНО] JsonPropertyName обязателен для camelCase с сервера
-    // ========================================================================
+    // Ответ сервера после авторизации
     public class AuthResponseDto
     {
         [JsonPropertyName("token")]
@@ -36,11 +28,18 @@ namespace GamesPlatform.Client.Models
         
         [JsonPropertyName("userName")]
         public string? UserName { get; set; }
+        
+        [JsonPropertyName("registrationDate")]
+        public DateTime RegistrationDate { get; set; }
+        
+        [JsonPropertyName("lastLoginDate")]
+        public DateTime? LastLoginDate { get; set; }
+        
+        [JsonPropertyName("dateOfBirth")]
+        public DateTime? DateOfBirth { get; set; }
     }
 
-    // ========================================================================
-    // [НАЗНАЧЕНИЕ] Модель игры с описанием и URL
-    // ========================================================================
+    // Модель игры с описанием и URL
     public class GameDto
     {
         [JsonPropertyName("gameId")]
@@ -49,7 +48,6 @@ namespace GamesPlatform.Client.Models
         [JsonPropertyName("gameTitle")]
         public string GameTitle { get; set; } = string.Empty;
         
-        // ✅ Новое поле для описания
         [JsonPropertyName("description")]
         public string? Description { get; set; }
         
@@ -68,7 +66,6 @@ namespace GamesPlatform.Client.Models
         [JsonPropertyName("developerId")]
         public int DeveloperId { get; set; }
         
-        // ✅ Только URL игры
         [JsonPropertyName("gameUrl")]
         public string GameUrl { get; set; } = string.Empty;
         
@@ -79,9 +76,7 @@ namespace GamesPlatform.Client.Models
         public string? DeveloperName { get; set; }
     }
 
-    // ========================================================================
-    // [НАЗНАЧЕНИЕ] Модель жанра
-    // ========================================================================
+    // Модель жанра
     public class GenreDto
     {
         [JsonPropertyName("genreId")]
@@ -91,9 +86,7 @@ namespace GamesPlatform.Client.Models
         public string GenreName { get; set; } = string.Empty;
     }
 
-    // ========================================================================
-    // [НАЗНАЧЕНИЕ] Модель комментария с поддержкой UserName
-    // ========================================================================
+    // Модель комментария с поддержкой UserName
     public class CommentDto
     {
         [JsonPropertyName("commentId")]
@@ -111,14 +104,11 @@ namespace GamesPlatform.Client.Models
         [JsonPropertyName("gameId")]
         public int GameId { get; set; }
         
-        // ✅ Обязательно для отображения реального ника
         [JsonPropertyName("userName")]
         public string? UserName { get; set; }
     }
 
-    // ========================================================================
-    // [НАЗНАЧЕНИЕ] DTO для отправки оценки
-    // ========================================================================
+    // DTO для отправки оценки
     public class RatingDto
     {
         [JsonPropertyName("gameId")]
@@ -128,9 +118,7 @@ namespace GamesPlatform.Client.Models
         public int RatingValue { get; set; }
     }
 
-    // ========================================================================
-    // [НАЗНАЧЕНИЕ] DTO для получения сводки рейтинга
-    // ========================================================================
+    // DTO для получения сводки рейтинга
     public class RatingSummaryDto
     {
         [JsonPropertyName("gameId")]
@@ -146,12 +134,17 @@ namespace GamesPlatform.Client.Models
         public int? UserRating { get; set; }
     }
 
-    // ========================================================================
-    // [НАЗНАЧЕНИЕ] DTO для смены ника
-    // ========================================================================
+    // DTO для смены ника
     public class UpdateUsernameDto
     {
         [JsonPropertyName("userName")]
         public string UserName { get; set; } = string.Empty;
+    }
+
+    // DTO для смены даты рождения
+    public class UpdateDateOfBirthDto
+    {
+        [JsonPropertyName("dateOfBirth")]
+        public DateTime? DateOfBirth { get; set; }
     }
 }

@@ -22,37 +22,56 @@ else
 {
     <h3><span>My Profile</span></h3>
     
-    <div class="card mb-4" style="max-width: 500px;">
+    <div class="card mb-4" style="max-width: 600px;">
         <div class="card-body">
             <p><span><strong>Username:</strong> @userName</span></p>
             <p><span><strong>Email:</strong> @userEmail</span></p>
             <p><span><strong>Role:</strong> @userRole</span></p>
+            
+            <p><span><strong>Registration Date:</strong> @(registrationDate?.ToString("dd.MM.yyyy HH:mm") ?? "N/A")</span></p>
+            <p><span><strong>Last Login:</strong> @(lastLoginDate?.ToString("dd.MM.yyyy HH:mm") ?? "N/A")</span></p>
+            <p><span><strong>Date of Birth:</strong> @(dateOfBirth?.ToString("dd.MM.yyyy") ?? "Not set")</span></p>
+            
             <button class="btn btn-danger" @onclick="HandleLogout"><span>Logout</span></button>
         </div>
     </div>
     
-    <div class="card" style="max-width: 500px;">
-        <div class="card-header"><h5><span>Change Nickname</span></h5></div>
-        <div class="card-body">
-            <form @onsubmit="HandleUpdateUsername">
-                <div class="mb-3">
-                    <label class="form-label"><span>New Username</span></label>
-                    <input type="text" class="form-control" @bind="newUserName" required minlength="3" maxlength="50" />
-                    <small class="text-muted"><span>Min 3 characters</span></small>
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header"><h5><span>Change Nickname</span></h5></div>
+                <div class="card-body">
+                    <form @onsubmit="HandleUpdateUsername">
+                        <div class="mb-3">
+                            <label class="form-label"><span>New Username</span></label>
+                            <input type="text" class="form-control" @bind="newUserName" required minlength="3" maxlength="50" />
+                        </div>
+                        <button type="submit" class="btn btn-primary" disabled="@(isUpdatingName || string.IsNullOrWhiteSpace(newUserName))">
+                            @if (isUpdatingName) { <span class="spinner-border spinner-border-sm"></span> <span>Updating...</span> }
+                            else { <span>Update Nickname</span> }
+                        </button>
+                    </form>
                 </div>
-                
-                @* ✅ ИСПРАВЛЕНО: Выражение обернуто в @(...) *@
-                <button type="submit" class="btn btn-primary" disabled="@(isUpdating || string.IsNullOrWhiteSpace(newUserName))">
-                    @if (isUpdating) 
-                    { 
-                        <span class="spinner-border spinner-border-sm"></span> <span>Updating...</span> 
-                    }
-                    else 
-                    { 
-                        <span>Update Nickname</span> 
-                    }
-                </button>
-            </form>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header"><h5><span>Update Date of Birth</span></h5></div>
+                <div class="card-body">
+                    <form @onsubmit="HandleUpdateDateOfBirth">
+                        <div class="mb-3">
+                            <label class="form-label"><span>Date of Birth</span></label>
+                            <input type="date" class="form-control" @bind="newDateOfBirth" />
+                            <small class="text-muted"><span>Leave empty to clear</span></small>
+                        </div>
+                        <button type="submit" class="btn btn-primary" disabled="@isUpdatingDob">
+                            @if (isUpdatingDob) { <span class="spinner-border spinner-border-sm"></span> <span>Saving...</span> }
+                            else { <span>Save Date</span> }
+                        </button>
+                    </form>
+                </div>
+            </div>
         </div>
     </div>
 }
@@ -60,12 +79,18 @@ else
 @code {
     private bool isLoaded = false;
     private bool isAuthenticated = false;
-    private bool isUpdating = false;
+    private bool isUpdatingName = false;
+    private bool isUpdatingDob = false;
     
     private string userName = "";
     private string userEmail = "";
     private string userRole = "";
+    private DateTime? registrationDate;
+    private DateTime? lastLoginDate;
+    private DateTime? dateOfBirth;
+    
     private string newUserName = "";
+    private DateTime? newDateOfBirth;
 
     protected override async Task OnInitializedAsync()
     {
@@ -73,17 +98,15 @@ else
         
         if (isAuthenticated)
         {
-            var name = await AuthService.GetUserNameAsync();
-            var email = await AuthService.GetUserEmailAsync();
-            var role = await AuthService.GetUserRoleAsync();
+            userName = await AuthService.GetUserNameAsync() ?? "Unknown";
+            userEmail = await AuthService.GetUserEmailAsync() ?? "Unknown";
+            userRole = await AuthService.GetUserRoleAsync() ?? "User";
+            registrationDate = await AuthService.GetRegistrationDateAsync();
+            lastLoginDate = await AuthService.GetLastLoginDateAsync();
+            dateOfBirth = await AuthService.GetDateOfBirthAsync();
             
-            // ✅ Надежная инициализация с fallback
-            userName = string.IsNullOrWhiteSpace(name) ? "Unknown" : name;
-            userEmail = string.IsNullOrWhiteSpace(email) ? "Unknown" : email;
-            userRole = string.IsNullOrWhiteSpace(role) ? "User" : role;
-            
-            // ✅ Гарантируем, что newUserName не пустой
             newUserName = userName;
+            newDateOfBirth = dateOfBirth;
         }
         
         isLoaded = true;
@@ -103,7 +126,7 @@ else
             return;
         }
         
-        isUpdating = true;
+        isUpdatingName = true;
         StateHasChanged();
         
         try
@@ -112,12 +135,37 @@ else
             if (success)
             {
                 userName = newUserName.Trim();
-                Notify.Show("Nickname updated successfully", "success");
             }
         }
         finally
         {
-            isUpdating = false;
+            isUpdatingName = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task HandleUpdateDateOfBirth()
+    {
+        if (newDateOfBirth.HasValue && newDateOfBirth.Value > DateTime.UtcNow)
+        {
+            Notify.Show("Date of birth cannot be in the future", "error");
+            return;
+        }
+        
+        isUpdatingDob = true;
+        StateHasChanged();
+        
+        try
+        {
+            var success = await AuthService.UpdateDateOfBirthAsync(newDateOfBirth);
+            if (success)
+            {
+                dateOfBirth = newDateOfBirth;
+            }
+        }
+        finally
+        {
+            isUpdatingDob = false;
             StateHasChanged();
         }
     }

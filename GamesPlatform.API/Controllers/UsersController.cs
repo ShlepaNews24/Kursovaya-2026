@@ -19,17 +19,13 @@ namespace GamesPlatform.API.Controllers
             _context = context;
         }
 
-        // ========================================================================
-        // [НАЗНАЧЕНИЕ] Получение списка всех пользователей
-        // [ДОСТУП] Только администраторы
-        // ========================================================================
+        // Получение списка всех пользователей
         [HttpGet]
         [Authorize(Roles = "Admin")]
         public async Task<ActionResult<IEnumerable<User>>> GetUsers()
         {
             var users = await _context.Users.ToListAsync();
             
-            // [БЕЗОПАСНОСТЬ] Очищаем хеши паролей перед отправкой
             foreach (var user in users)
             {
                 user.PasswordHash = "";
@@ -38,10 +34,7 @@ namespace GamesPlatform.API.Controllers
             return users;
         }
 
-        // ========================================================================
-        // [НАЗНАЧЕНИЕ] Получение пользователя по ID
-        // [ДОСТУП] Авторизованные пользователи
-        // ========================================================================
+        // Получение пользователя по ID
         [HttpGet("{id}")]
         [Authorize]
         public async Task<ActionResult<User>> GetUser(int id)
@@ -53,16 +46,12 @@ namespace GamesPlatform.API.Controllers
                 return NotFound();
             }
 
-            // [БЕЗОПАСНОСТЬ] Не возвращаем пароль
             user.PasswordHash = "";
 
             return user;
         }
 
-        // ========================================================================
-        // [НАЗНАЧЕНИЕ] Обновление данных пользователя
-        // [ДОСТУП] Авторизованные (обычно админ или владелец профиля)
-        // ========================================================================
+        // Обновление данных пользователя
         [HttpPut("{id}")]
         [Authorize]
         public async Task<IActionResult> PutUser(int id, User user)
@@ -93,24 +82,17 @@ namespace GamesPlatform.API.Controllers
             return NoContent();
         }
 
-        // ========================================================================
-        // [НАЗНАЧЕНИЕ] Смена ника текущего пользователя
-        // [МАРШРУТ] PUT /api/users/me/username
-        // [ДОСТУП] Авторизованный пользователь
-        // [БЕЗОПАСНОСТЬ] ID берётся из токена, проверка уникальности ника
-        // ========================================================================
+        // Смена ника текущего пользователя
         [HttpPut("me/username")]
         [Authorize]
         public async Task<IActionResult> UpdateUsername([FromBody] UpdateUsernameDto dto)
         {
-            // 1. Получаем ID пользователя из JWT-токена
             var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
             if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out var userId))
             {
                 return Unauthorized("Не удалось определить пользователя из токена");
             }
 
-            // 2. Валидация нового ника
             if (string.IsNullOrWhiteSpace(dto.UserName))
                 return BadRequest("Имя пользователя не может быть пустым");
             
@@ -122,14 +104,12 @@ namespace GamesPlatform.API.Controllers
             if (dto.UserName.Length > 50)
                 return BadRequest("Имя пользователя не должно превышать 50 символов");
 
-            // 3. Проверка уникальности (исключая текущего пользователя)
             var exists = await _context.Users.AnyAsync(u => u.UserName == dto.UserName && u.UserId != userId);
             if (exists)
             {
                 return BadRequest("Пользователь с таким именем уже существует");
             }
 
-            // 4. Поиск и обновление пользователя
             var user = await _context.Users.FindAsync(userId);
             if (user == null)
             {
@@ -142,10 +122,35 @@ namespace GamesPlatform.API.Controllers
             return Ok(new { message = "Имя пользователя успешно обновлено", userName = user.UserName });
         }
 
-        // ========================================================================
-        // [НАЗНАЧЕНИЕ] Регистрация нового пользователя
-        // [ДОСТУП] Разрешено всем
-        // ========================================================================
+        // Обновление даты рождения текущего пользователя
+        [HttpPut("me/dateofbirth")]
+        [Authorize]
+        public async Task<IActionResult> UpdateDateOfBirth([FromBody] UpdateDateOfBirthDto dto)
+        {
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+            if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out var userId))
+            {
+                return Unauthorized("Не удалось определить пользователя из токена");
+            }
+
+            if (dto.DateOfBirth.HasValue && dto.DateOfBirth.Value > DateTime.UtcNow)
+            {
+                return BadRequest("Дата рождения не может быть в будущем");
+            }
+
+            var user = await _context.Users.FindAsync(userId);
+            if (user == null)
+            {
+                return NotFound("Пользователь не найден");
+            }
+
+            user.DateOfBirth = dto.DateOfBirth;
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Дата рождения успешно обновлена", dateOfBirth = user.DateOfBirth });
+        }
+
+        // Регистрация нового пользователя
         [HttpPost]
         [AllowAnonymous]
         public async Task<ActionResult<User>> PostUser(User user)
@@ -156,17 +161,14 @@ namespace GamesPlatform.API.Controllers
             _context.Users.Add(user);
             await _context.SaveChangesAsync();
 
-            // [БЕЗОПАСНОСТЬ] Очищаем пароль в ответе
             var result = user;
             result.PasswordHash = "";
             
             return CreatedAtAction(nameof(GetUser), new { id = user.UserId }, result);
         }
 
-        // ========================================================================
-        // [НАЗНАЧЕНИЕ] Удаление пользователя
-        // [ДОСТУП] Только администраторы
-        // ========================================================================
+        // Удаление пользователя
+        // Только администраторы
         [HttpDelete("{id}")]
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> DeleteUser(int id)
@@ -189,12 +191,16 @@ namespace GamesPlatform.API.Controllers
         }
     }
 
-    // ============================================================================
-    // [НАЗНАЧЕНИЕ] DTO для запроса смены имени пользователя
-    // ============================================================================
+    // DTO для запроса смены имени пользователя
     public class UpdateUsernameDto
     {
         [Required]
         public string UserName { get; set; } = string.Empty;
+    }
+
+    // DTO для запроса смены даты рождения
+    public class UpdateDateOfBirthDto
+    {
+        public DateTime? DateOfBirth { get; set; }
     }
 }

@@ -1,6 +1,4 @@
-// [НАЗНАЧЕНИЕ] Сервис авторизации на сервере
-// [ФАЙЛ] GamesPlatform.API/Features/Auth/AuthService.cs
-
+// Сервис авторизации с полной поддержкой профиля
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
@@ -31,9 +29,7 @@ namespace GamesPlatform.API.Features.Auth
             _passwordHasher = new PasswordHasher<User>();
         }
 
-        // ====================================================================
-        // [НАЗНАЧЕНИЕ] Регистрация нового пользователя
-        // ====================================================================
+        // Регистрация нового пользователя
         public async Task<AuthResponseDto> RegisterAsync(RegisterDto dto)
         {
             if (await _context.Users.AnyAsync(u => u.Email == dto.Email))
@@ -46,22 +42,22 @@ namespace GamesPlatform.API.Features.Auth
             {
                 UserName = dto.UserName,
                 Email = dto.Email,
-                RegistrationDate = DateTime.UtcNow,
+                UserType = "User",
                 IsActive = true,
-                UserType = "User"
+                RegistrationDate = DateTime.UtcNow,
+                LastLoginDate = null,
+                DateOfBirth = null
             };
 
             user.PasswordHash = _passwordHasher.HashPassword(user, dto.Password);
-            
+
             _context.Users.Add(user);
             await _context.SaveChangesAsync();
 
             return GenerateToken(user);
         }
 
-        // ====================================================================
-        // [НАЗНАЧЕНИЕ] Вход пользователя
-        // ====================================================================
+        // Вход пользователя
         public async Task<AuthResponseDto> LoginAsync(LoginDto dto)
         {
             var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == dto.Email);
@@ -72,12 +68,12 @@ namespace GamesPlatform.API.Features.Auth
             if (result == PasswordVerificationResult.Failed)
                 throw new Exception("Неверный email или пароль");
 
+            user.LastLoginDate = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+
             return GenerateToken(user);
         }
 
-        // ====================================================================
-        // [НАЗНАЧЕНИЕ] Генерация JWT-токена и формирование ответа
-        // ====================================================================
         private AuthResponseDto GenerateToken(User user)
         {
             var jwtSettings = _config.GetSection("JwtSettings");
@@ -100,14 +96,16 @@ namespace GamesPlatform.API.Features.Auth
                 expires: expiry,
                 signingCredentials: creds);
 
-            // ✅ Возвращаем все необходимые данные клиенту
             return new AuthResponseDto
             {
                 Token = new JwtSecurityTokenHandler().WriteToken(token),
                 ExpiresAt = expiry,
                 UserType = user.UserType,
                 UserId = user.UserId.ToString(),
-                UserName = user.UserName
+                UserName = user.UserName,
+                RegistrationDate = user.RegistrationDate,
+                LastLoginDate = user.LastLoginDate,
+                DateOfBirth = user.DateOfBirth
             };
         }
     }
