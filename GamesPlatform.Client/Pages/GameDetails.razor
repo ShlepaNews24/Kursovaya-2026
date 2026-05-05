@@ -1,3 +1,4 @@
+@* Страница деталей игры*@
 @page "/game/{Id:int}"
 @inject IGamesService GamesService
 @inject IAuthService AuthService
@@ -18,109 +19,125 @@ else if (game == null)
 }
 else
 {
-    @* Обложка *@
-    @if (!string.IsNullOrEmpty(game.Logo))
-    {
-        <div class="mb-4">
-            <img src="@game.Logo" 
-                 class="img-fluid rounded shadow" 
-                 style="max-height: 400px; width: 100%; object-fit: cover;" 
-                 alt="@game.GameTitle" />
-        </div>
-    }
+    <div class="row">
+        @* Левая колонка: Логотип и инфо *@
+        <div class="col-md-4 mb-4">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body text-center">
+                    @* ✅ ЛОГОТИП 180x180 *@
+                    @if (!string.IsNullOrEmpty(game.Logo))
+                    {
+                        <img src="@game.Logo" 
+                             class="mb-3 rounded shadow-sm" 
+                             style="width: 180px; height: 180px; object-fit: cover;" 
+                             alt="@game.GameTitle" />
+                    }
+                    else
+                    {
+                        @* Заглушка, если лого нет *@
+                        <div class="mb-3 rounded shadow-sm bg-secondary d-flex align-items-center justify-content-center text-white"
+                             style="width: 180px; height: 180px; margin: 0 auto;">
+                            <span>No Logo</span>
+                        </div>
+                    }
 
-    <h3><span>@game.GameTitle</span></h3>
-    
-    @* Описание *@
-    @if (!string.IsNullOrWhiteSpace(game.Description))
-    {
-        <div class="alert alert-secondary mb-3">
-            <span>@game.Description</span>
-        </div>
-    }
-    
-    <p class="text-muted"><span>@game.ReleaseDate.ToShortDateString()</span></p>
-    
-    @* Рейтинг *@
-    @if (rating != null)
-    {
-        <div class="mb-3">
-            <span class="me-2">
-                @for (int i = 1; i <= 5; i++)
-                {
-                    <span style="color: @(i <= rating.AverageRating ? "#ffc107" : "#ddd"); font-size: 1.2rem;">★</span>
-                }
-            </span>
-            <span class="text-muted"><span>@rating.AverageRating (@rating.TotalVotes votes)</span></span>
-        </div>
-    }
-    
-    @* Iframe с игрой *@
-    <div class="card mb-4">
-        <div class="card-header"><h5><span>Play Game</span></h5></div>
-        <div class="card-body">
-            @if (!string.IsNullOrEmpty(game.GameUrl))
-            {
-                <div class="ratio ratio-16x9 mb-3" style="background: #000; border-radius: 8px; overflow: hidden;">
-                    @* ✅ ИСПРАВЛЕНО: Добавлен allow-popups *@
-                    <iframe src="@game.GameUrl" 
-                            sandbox="allow-scripts allow-same-origin allow-pointer-lock allow-forms allow-popups"
-                            style="border: none; width: 100%; height: 100%;"
-                            title="@game.GameTitle"
-                            loading="lazy">
-                    </iframe>
+                    <h4 class="card-title"><span>@game.GameTitle</span></h4>
+                    <p class="text-muted small"><span>@game.ReleaseDate.ToShortDateString()</span></p>
+                    
+                    @if (!string.IsNullOrWhiteSpace(game.Description))
+                    {
+                        <div class="alert alert-secondary text-start mt-3">
+                            <small><span>@game.Description</span></small>
+                        </div>
+                    }
                 </div>
-                <div class="alert alert-success d-flex align-items-center">
-                    <span class="me-2"><span>Game loaded</span></span>
-                    <a href="@game.GameUrl" 
-                       class="btn btn-outline-primary btn-sm" 
-                       target="_blank" 
-                       rel="noopener noreferrer">
-                        <span>Open in new tab</span>
-                    </a>
+            </div>
+        </div>
+
+        <div class="col-md-8">
+            @* Рейтинг *@
+            @if (rating != null)
+            {
+                <div class="mb-3">
+                    <span class="me-2">
+                        @for (int i = 1; i <= 5; i++)
+                        {
+                            <span style="color: @(i <= rating.AverageRating ? "#ffc107" : "#ddd"); font-size: 1.2rem;">★</span>
+                        }
+                    </span>
+                    <span class="text-muted"><span>@rating.AverageRating (@rating.TotalVotes votes)</span></span>
                 </div>
             }
-            else
-            {
-                <div class="alert alert-warning"><span>No game URL provided.</span></div>
-            }
+            
+            @* ✅ ОКНО ИГРЫ: Чуть меньше и по центру *@
+            <div class="card mb-4 shadow-sm">
+                <div class="card-header"><h5><span>Play Game</span></h5></div>
+                <div class="card-body">
+                    @if (!string.IsNullOrEmpty(game.GameUrl))
+                    {
+                        <div class="mx-auto" style="max-width: 900px;">
+                            <div class="ratio ratio-16x9 rounded overflow-hidden shadow" style="background: #000;">
+                                <iframe src="@game.GameUrl" 
+                                        sandbox="allow-scripts allow-same-origin allow-pointer-lock allow-forms allow-popups"
+                                        style="border: none; width: 100%; height: 100%;"
+                                        title="@game.GameTitle"
+                                        loading="lazy">
+                                </iframe>
+                            </div>
+                        </div>
+                        
+                        <div class="text-center mt-3">
+                            <a href="@game.GameUrl" 
+                               class="btn btn-outline-primary btn-sm" 
+                               target="_blank" 
+                               rel="noopener noreferrer">
+                                <span>Open in new tab</span>
+                            </a>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="alert alert-warning"><span>No game URL provided.</span></div>
+                    }
+                </div>
+            </div>
+
+            @* Оценка *@
+            <div class="card mb-4 shadow-sm">
+                <div class="card-header"><h5><span>Rate this Game</span></h5></div>
+                <div class="card-body">
+                    @if (isAuthenticated)
+                    {
+                        <div class="d-flex align-items-center">
+                            <span class="me-2"><span>Your rating:</span></span>
+                            @for (int i = 1; i <= 5; i++)
+                            {
+                                var star = i;
+                                <button class="btn btn-link p-0 me-1" 
+                                        @onclick="() => SubmitRating(star)" 
+                                        disabled="@(isRating)">
+                                    <span style="color: @(i <= userRatingValue ? "#ffc107" : "#ddd"); font-size: 1.5rem;">
+                                        @(i <= userRatingValue ? "★" : "☆")
+                                    </span>
+                                </button>
+                            }
+                            @if (isRating)
+                            {
+                                <span class="spinner-border spinner-border-sm ms-2" role="status"></span>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="mb-0"><span><a href="/login"><span>Login</span></a> to rate this game.</span></p>
+                    }
+                </div>
+            </div>
         </div>
     </div>
 
-    @* Оценка *@
-    <div class="card mb-4">
-        <div class="card-header"><h5><span>Rate this Game</span></h5></div>
-        <div class="card-body">
-            @if (isAuthenticated)
-            {
-                <div class="d-flex align-items-center">
-                    <span class="me-2"><span>Your rating:</span></span>
-                    @for (int i = 1; i <= 5; i++)
-                    {
-                        var star = i;
-                        <button class="btn btn-link p-0 me-1" 
-                                @onclick="() => SubmitRating(star)" 
-                                disabled="@(isRating)">
-                            <span style="color: @(i <= userRatingValue ? "#ffc107" : "#ddd"); font-size: 1.5rem;">
-                                @(i <= userRatingValue ? "★" : "☆")
-                            </span>
-                        </button>
-                    }
-                    @if (isRating)
-                    {
-                        <span class="spinner-border spinner-border-sm ms-2" role="status"></span>
-                    }
-                </div>
-            }
-            else
-            {
-                <p class="mb-0"><span><a href="/login"><span>Login</span></a> to rate this game.</span></p>
-            }
-        </div>
-    </div>
-
-    @* Комментарии *@
-    <div class="card mb-4">
+    @* Комментарии на всю ширину внизу *@
+    <div class="card mb-4 shadow-sm">
         <div class="card-header"><h5><span>Comments (@(comments?.Count ?? 0))</span></h5></div>
         <div class="card-body">
             @if (comments?.Any() == true)

@@ -2,20 +2,14 @@ using Microsoft.EntityFrameworkCore;
 using GamesPlatform.API.Data;
 using Microsoft.OpenApi.Models;
 using System.Text.Json.Serialization;  
-
-// Для JWT-авторизации
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using GamesPlatform.API.Features.Auth;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-
-// Регистрация сервиса авторизации в DI-контейнере
 builder.Services.AddScoped<IAuthService, AuthService>();
 
-// Настройка аутентификации через JWT-токены
 builder.Services.AddAuthentication("Bearer")
     .AddJwtBearer(options =>
     {
@@ -32,10 +26,8 @@ builder.Services.AddAuthentication("Bearer")
         };
     });
 
-// Включение middleware аутентификации и авторизации
 builder.Services.AddAuthorization();
 
-// Настройка Entity Framework с SQLite
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
 
@@ -46,7 +38,6 @@ builder.Services.AddControllers()
         options.JsonSerializerOptions.WriteIndented = false; 
     });
 
-// Настройка CORS (для клиентского приложения)
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll",
@@ -58,7 +49,6 @@ builder.Services.AddCors(options =>
         });
 });
 
-// Настройка Swagger
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
@@ -68,24 +58,47 @@ builder.Services.AddSwaggerGen(c =>
         Version = "v1",
         Description = "API для платформы браузерных игр"
     });
+    
+    c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        In = ParameterLocation.Header,
+        Description = "Введите токен в формате: Bearer {ваш_токен}",
+        Name = "Authorization",
+        Type = SecuritySchemeType.Http,
+        Scheme = "bearer",
+        BearerFormat = "JWT"
+    });
+
+    c.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
+        {
+            new OpenApiSecurityScheme
+            {
+                Reference = new OpenApiReference 
+                { 
+                    Type = ReferenceType.SecurityScheme, 
+                    Id = "Bearer" 
+                }
+            },
+            Array.Empty<string>()
+        }
+    });
 });
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI(c =>
     {
         c.SwaggerEndpoint("/swagger/v1/swagger.json", "Games Platform API v1");
-        c.RoutePrefix = string.Empty; // Swagger UI на корне
+        c.RoutePrefix = string.Empty; 
     });
 }
 
 app.UseHttpsRedirection();
 
-// Используем CORS
 app.UseCors("AllowAll");
 
 app.UseStaticFiles();
@@ -95,7 +108,6 @@ app.UseAuthorization();
 
 app.MapControllers();
 
-// Создаем базу данных при запуске (для разработки)
 using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;

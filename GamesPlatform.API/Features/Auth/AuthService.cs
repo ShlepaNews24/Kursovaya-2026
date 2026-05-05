@@ -29,7 +29,6 @@ namespace GamesPlatform.API.Features.Auth
             _passwordHasher = new PasswordHasher<User>();
         }
 
-        // Регистрация нового пользователя
         public async Task<AuthResponseDto> RegisterAsync(RegisterDto dto)
         {
             if (await _context.Users.AnyAsync(u => u.Email == dto.Email))
@@ -38,11 +37,13 @@ namespace GamesPlatform.API.Features.Auth
             if (await _context.Users.AnyAsync(u => u.UserName == dto.UserName))
                 throw new Exception("Пользователь с таким именем уже существует");
 
+            var userType = (await _context.Users.CountAsync() == 0) ? "Admin" : "User";
+
             var user = new User
             {
                 UserName = dto.UserName,
                 Email = dto.Email,
-                UserType = "User",
+                UserType = userType, 
                 IsActive = true,
                 RegistrationDate = DateTime.UtcNow,
                 LastLoginDate = null,
@@ -57,7 +58,6 @@ namespace GamesPlatform.API.Features.Auth
             return GenerateToken(user);
         }
 
-        // Вход пользователя
         public async Task<AuthResponseDto> LoginAsync(LoginDto dto)
         {
             var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == dto.Email);

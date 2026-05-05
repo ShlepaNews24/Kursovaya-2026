@@ -1,51 +1,82 @@
-@namespace GamesPlatform.Client.Shared
-@* Боковое меню навигации с адаптивным отображением по ролям *@
 <div class="top-row ps-3 navbar navbar-dark">
     <div class="container-fluid">
-        <a class="navbar-brand" href="">🎮 Games Platform</a>
+        <a class="navbar-brand" href=""><span>Games Platform</span></a>
     </div>
 </div>
 
-<input type="checkbox" title="Navigation menu toggle" id="navbar-toggler" />
-<label for="navbar-toggler" class="navbar-toggler" aria-label="Toggle navigation"></label>
-
-<div class="nav-scrollable" onclick="document.getElementById('navbar-toggler').checked = false;">
-    <nav class="flex-column">
-        <div class="nav-item px-3">
+<div class="nav-menu">
+    <ul class="nav flex-column">
+        <li class="nav-item px-3">
             <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                <span class="bi bi-house-door" aria-hidden="true"></span> Главная
+                <span class="bi bi-house-door-fill"></span> <span>Home</span>
             </NavLink>
-        </div>
-        <div class="nav-item px-3">
+        </li>
+        <li class="nav-item px-3">
             <NavLink class="nav-link" href="games">
-                <span class="bi bi-grid" aria-hidden="true"></span> Каталог игр
+                <span class="bi bi-list"></span> <span>Games</span>
             </NavLink>
-        </div>
+        </li>
         @if (IsAuthenticated)
         {
-            <div class="nav-item px-3">
+            <li class="nav-item px-3">
                 <NavLink class="nav-link" href="games/create">
-                    <span class="bi bi-plus-circle" aria-hidden="true"></span> Добавить игру
+                    <span class="bi bi-plus-circle"></span> <span>Add Game</span>
                 </NavLink>
-            </div>
-            <div class="nav-item px-3">
+            </li>
+            <li class="nav-item px-3">
                 <NavLink class="nav-link" href="profile">
-                    <span class="bi bi-person" aria-hidden="true"></span> Профиль
+                    <span class="bi bi-person"></span> <span>Profile</span>
                 </NavLink>
-            </div>
+            </li>
             @if (UserRole == "Admin")
             {
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link text-warning" href="admin">
-                        <span class="bi bi-shield-lock" aria-hidden="true"></span> Админ-панель
+                <li class="nav-item px-3">
+                    <NavLink class="nav-link" href="admin">
+                        <span class="bi bi-shield-lock"></span> <span>Admin Panel</span>
                     </NavLink>
-                </div>
+                </li>
             }
+            <li class="nav-item px-3">
+                <button class="btn btn-link nav-link" @onclick="Logout">
+                    <span class="bi bi-box-arrow-right"></span> <span>Logout</span>
+                </button>
+            </li>
         }
-    </nav>
+        else
+        {
+            <li class="nav-item px-3">
+                <NavLink class="nav-link" href="login">
+                    <span class="bi bi-box-arrow-in-right"></span> <span>Login</span>
+                </NavLink>
+            </li>
+        }
+    </ul>
 </div>
 
 @code {
-    [Parameter] public bool IsAuthenticated { get; set; }
-    [Parameter] public string? UserRole { get; set; }
+    private bool IsAuthenticated = false;
+    private string UserRole = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CheckAuth();
+    }
+
+    private async Task CheckAuth()
+    {
+        IsAuthenticated = await AuthService.IsAuthenticatedAsync();
+        if (IsAuthenticated)
+        {
+            UserRole = await AuthService.GetUserRoleAsync() ?? "";
+        }
+    }
+
+    private async Task Logout()
+    {
+        await AuthService.LogoutAsync();
+        Nav.NavigateTo("/");
+    }
+
+    [Inject] public IAuthService AuthService { get; set; } = null!;
+    [Inject] public NavigationManager Nav { get; set; } = null!;
 }
