@@ -1,12 +1,11 @@
-// Контроллер управления играми с пагинацией и фильтрацией
+// Контроллер управления играми 
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
-using GamesPlatform.API.Data;
+using GamesPlatform.API.Interfaces;
 using GamesPlatform.API.Models;
 
 namespace GamesPlatform.API.Controllers
@@ -15,33 +14,31 @@ namespace GamesPlatform.API.Controllers
     [ApiController]
     public class GamesController : ControllerBase
     {
-        private readonly AppDbContext _context;
+        private readonly IUnitOfWork _uow;
 
-        public GamesController(AppDbContext context) => _context = context;
+        public GamesController(IUnitOfWork uow) => _uow = uow;
 
-        // (ПАГИНАЦИЯ И ФИЛЬТРАЦИЯ) Получение списка игр
         [HttpGet]
         public async Task<ActionResult<PagedResult<GameDto>>> GetGames([FromQuery] GamesQueryDto query)
         {
-            var queryable = _context.Games
-                .Include(g => g.Genre)
-                .Include(g => g.Developer)
+            // Получаем все игры через репозиторий
+            var games = (await _uow.Games.GetAllAsync())
+                .OrderByDescending(g => g.ModifiedDate)
                 .AsQueryable();
 
             if (!string.IsNullOrWhiteSpace(query.Search))
             {
-                queryable = queryable.Where(g => g.GameTitle.Contains(query.Search));
+                games = games.Where(g => g.GameTitle.Contains(query.Search));
             }
 
             if (query.GenreId.HasValue)
             {
-                queryable = queryable.Where(g => g.GenreId == query.GenreId.Value);
+                games = games.Where(g => g.GenreId == query.GenreId.Value);
             }
 
-            var totalCount = await queryable.CountAsync();
+            var totalCount = games.Count();
 
-            var items = await queryable
-                .OrderByDescending(g => g.ModifiedDate)
+            var items = games
                 .Skip((query.PageNumber - 1) * query.PageSize)
                 .Take(query.PageSize)
                 .Select(g => new GameDto
@@ -54,11 +51,9 @@ namespace GamesPlatform.API.Controllers
                     Logo = g.Logo,
                     GameUrl = g.GameUrl,
                     GenreId = g.GenreId,
-                    GenreName = g.Genre != null ? g.Genre.GenreName : null,
-                    DeveloperId = g.DeveloperId,
-                    DeveloperName = g.Developer != null ? g.Developer.UserName : null
+                    DeveloperId = g.DeveloperId
                 })
-                .ToListAsync();
+                .ToList();
 
             return Ok(new PagedResult<GameDto>
             {
@@ -72,11 +67,7 @@ namespace GamesPlatform.API.Controllers
         [HttpGet("{id}")]
         public async Task<ActionResult<GameDto>> GetGame(int id)
         {
-            var game = await _context.Games
-                .Include(g => g.Genre)
-                .Include(g => g.Developer)
-                .FirstOrDefaultAsync(g => g.GameId == id);
-
+            var game = await _uow.Games.GetByIdAsync(id);
             if (game == null) return NotFound("Игра не найдена");
 
             return Ok(new GameDto
@@ -89,14 +80,10 @@ namespace GamesPlatform.API.Controllers
                 Logo = game.Logo,
                 GameUrl = game.GameUrl,
                 GenreId = game.GenreId,
-                GenreName = game.Genre?.GenreName,
-                DeveloperId = game.DeveloperId,
-                DeveloperName = game.Developer?.UserName
+                DeveloperId = game.DeveloperId
             });
         }
 
-        // Новая игра
-        // Авторизованные пользователи
         [HttpPost]
         [Authorize]
         public async Task<ActionResult<GameDto>> PostGame(Game game)
@@ -117,11 +104,11 @@ namespace GamesPlatform.API.Controllers
             game.DeveloperId = userId;
             game.ModifiedDate = DateTime.UtcNow;
 
-            var genreExists = await _context.Genres.AnyAsync(g => g.GenreId == game.GenreId);
-            if (!genreExists) return BadRequest("Указанный жанр не существует");
+            if (!await _uow.Genres.ExistsAsync(game.GenreId))
+                return BadRequest("Указанный жанр не существует");
 
-            _context.Games.Add(game);
-            await _context.SaveChangesAsync();
+            await _uow.Games.AddAsync(game);
+            await _uow.SaveAsync(); 
 
             return CreatedAtAction(nameof(GetGame), new { id = game.GameId }, new GameDto
             {
@@ -137,8 +124,6 @@ namespace GamesPlatform.API.Controllers
             });
         }
 
-        // Изменение игры
-        // (ДОСТУП) Автор или Админ
         [HttpPut("{id}")]
         [Authorize]
         public async Task<IActionResult> PutGame(int id, Game game)
@@ -147,7 +132,7 @@ namespace GamesPlatform.API.Controllers
             if (!Uri.IsWellFormedUriString(game.GameUrl, UriKind.Absolute))
                 return BadRequest("Некорректный формат URL");
 
-            var existing = await _context.Games.FindAsync(id);
+            var existing = await _uow.Games.GetByIdAsync(id);
             if (existing == null) return NotFound("Игра не найдена");
 
             var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
@@ -167,17 +152,17 @@ namespace GamesPlatform.API.Controllers
             existing.Logo = game.Logo;
             existing.ModifiedDate = DateTime.UtcNow;
 
-            await _context.SaveChangesAsync();
+            await _uow.Games.UpdateAsync(existing);
+            await _uow.SaveAsync(); 
+
             return NoContent();
         }
 
-        // Удаление игры
-        // (ДОСТУП) Автор или Админ
         [HttpDelete("{id}")]
         [Authorize]
         public async Task<IActionResult> DeleteGame(int id)
         {
-            var game = await _context.Games.FindAsync(id);
+            var game = await _uow.Games.GetByIdAsync(id);
             if (game == null) return NotFound("Игра не найдена");
 
             var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
@@ -189,8 +174,9 @@ namespace GamesPlatform.API.Controllers
             if (userRole != "Admin" && game.DeveloperId != userId)
                 return StatusCode(403, "Нет прав на удаление чужой игры");
 
-            _context.Games.Remove(game);
-            await _context.SaveChangesAsync();
+            await _uow.Games.DeleteAsync(game);
+            await _uow.SaveAsync(); 
+
             return NoContent();
         }
     }

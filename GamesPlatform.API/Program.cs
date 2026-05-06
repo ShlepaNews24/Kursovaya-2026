@@ -5,6 +5,11 @@ using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using GamesPlatform.API.Features.Auth;
+using GamesPlatform.API.Interfaces;
+using GamesPlatform.API.Repositories;
+using Microsoft.AspNetCore.Identity;
+using GamesPlatform.API.Models;
+
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -85,7 +90,10 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
+builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
+
 var app = builder.Build();
+
 
 if (app.Environment.IsDevelopment())
 {
