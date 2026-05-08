@@ -21,7 +21,6 @@ namespace GamesPlatform.API.Controllers
         [HttpGet]
         public async Task<ActionResult<PagedResult<GameDto>>> GetGames([FromQuery] GamesQueryDto query)
         {
-            // Получаем все игры через репозиторий
             var games = (await _uow.Games.GetAllAsync())
                 .OrderByDescending(g => g.ModifiedDate)
                 .AsQueryable();
