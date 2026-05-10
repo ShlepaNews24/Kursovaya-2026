@@ -1,0 +1,86 @@
+@* [НАЗНАЧЕНИЕ] Компонент всплывающих уведомлений (toast) *@
+@* [ФАЙЛ] Shared/ToastNotification.razor *@
+@inject INotificationService Notify
+
+@if (showNotification)
+{
+    <div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 9999;">
+        <div class="toast show @GetToastClass(notificationType)" role="alert">
+            <div class="toast-header">
+                <strong class="me-auto">@GetToastTitle(notificationType)</strong>
+                <button type="button" class="btn-close" @onclick="HideNotification"></button>
+            </div>
+            <div class="toast-body">@message</div>
+        </div>
+    </div>
+}
+
+@code {
+    private bool showNotification = false;
+    private string message = "";
+    private string notificationType = "info";
+    private CancellationTokenSource? _cts;
+
+    protected override void OnInitialized() => Notify.OnNotify += ShowNotificationHandler;
+
+    private async void ShowNotificationHandler(string msg, string type)
+    {
+        // [ОТМЕНА ПРЕДЫДУЩЕГО ТАЙМЕРА] Если уже есть активное уведомление
+        _cts?.Cancel();
+        _cts = new CancellationTokenSource();
+
+        message = msg;
+        notificationType = type;
+        showNotification = true;
+        StateHasChanged();
+
+        try
+        {
+            // ✅ ИСПРАВЛЕНО: Используем простой await вместо TaskScheduler
+            await Task.Delay(5000, _cts.Token);
+            
+            // Проверяем, не было ли отмены
+            if (!_cts.IsCancellationRequested)
+            {
+                await InvokeAsync(() => {
+                    showNotification = false;
+                    StateHasChanged();
+                });
+            }
+        }
+        catch (TaskCanceledException)
+        {
+            // [ОЖИДАЕМО] Таймер отменён новым уведомлением — ничего не делаем
+        }
+    }
+
+    private void HideNotification()
+    {
+        _cts?.Cancel();
+        showNotification = false;
+        StateHasChanged();
+    }
+
+    private string GetToastClass(string type) => type switch
+    {
+        "success" => "bg-success text-white",
+        "error" => "bg-danger text-white",
+        "warning" => "bg-warning text-dark",
+        _ => "bg-info text-white"
+    };
+
+    private string GetToastTitle(string type) => type switch
+    {
+        "success" => "Success",
+        "error" => "Error",
+        "warning" => "Warning",
+        _ => "Info"
+    };
+
+    public void Dispose()
+    {
+        Notify.OnNotify -= ShowNotificationHandler;
+        _cts?.Cancel();
+        _cts?.Dispose();
+    }
+}

@@ -1,0 +1,178 @@
+@page "/profile"
+@inject IAuthService AuthService
+@inject NavigationManager Nav
+@inject INotificationService Notify
+
+<PageTitle><span>Profile</span></PageTitle>
+
+@if (!isLoaded)
+{
+    <div class="text-center py-5">
+        <div class="spinner-border text-primary" role="status"></div>
+        <p class="mt-2"><span>Loading...</span></p>
+    </div>
+}
+else if (!isAuthenticated)
+{
+    <div class="alert alert-warning">
+        <span>⚠️ <a href="/login"><span>Login</span></a> to view profile.</span>
+    </div>
+}
+else
+{
+    <h3><span>My Profile</span></h3>
+    
+    <div class="card mb-4" style="max-width: 600px;">
+        <div class="card-body">
+            <p><span><strong>Username:</strong> @userName</span></p>
+            <p><span><strong>Email:</strong> @userEmail</span></p>
+            <p><span><strong>Role:</strong> @userRole</span></p>
+            
+            <p><span><strong>Registration Date:</strong> @(registrationDate?.ToString("dd.MM.yyyy HH:mm") ?? "N/A")</span></p>
+            <p><span><strong>Last Login:</strong> @(lastLoginDate?.ToString("dd.MM.yyyy HH:mm") ?? "N/A")</span></p>
+            <p><span><strong>Date of Birth:</strong> @(dateOfBirth?.ToString("dd.MM.yyyy") ?? "Not set")</span></p>
+            
+            <button class="btn btn-danger" @onclick="HandleLogout"><span>Logout</span></button>
+        </div>
+    </div>
+    
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header"><h5><span>Change Nickname</span></h5></div>
+                <div class="card-body">
+                    <form @onsubmit="HandleUpdateUsername">
+                        <div class="mb-3">
+                            <label class="form-label"><span>New Username</span></label>
+                            <input type="text" class="form-control" @bind="newUserName" required minlength="3" maxlength="50" />
+                        </div>
+                        <button type="submit" class="btn btn-primary" disabled="@(isUpdatingName || string.IsNullOrWhiteSpace(newUserName))">
+                            @if (isUpdatingName) { <span class="spinner-border spinner-border-sm"></span> <span>Updating...</span> }
+                            else { <span>Update Nickname</span> }
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header"><h5><span>Update Date of Birth</span></h5></div>
+                <div class="card-body">
+                    <form @onsubmit="HandleUpdateDateOfBirth">
+                        <div class="mb-3">
+                            <label class="form-label"><span>Date of Birth</span></label>
+                            <input type="date" class="form-control" @bind="newDateOfBirth" />
+                            <small class="text-muted"><span>Leave empty to clear</span></small>
+                        </div>
+                        <button type="submit" class="btn btn-primary" disabled="@isUpdatingDob">
+                            @if (isUpdatingDob) { <span class="spinner-border spinner-border-sm"></span> <span>Saving...</span> }
+                            else { <span>Save Date</span> }
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private bool isLoaded = false;
+    private bool isAuthenticated = false;
+    private bool isUpdatingName = false;
+    private bool isUpdatingDob = false;
+    
+    private string userName = "";
+    private string userEmail = "";
+    private string userRole = "";
+    private DateTime? registrationDate;
+    private DateTime? lastLoginDate;
+    private DateTime? dateOfBirth;
+    
+    private string newUserName = "";
+    private DateTime? newDateOfBirth;
+
+    protected override async Task OnInitializedAsync()
+    {
+        isAuthenticated = await AuthService.IsAuthenticatedAsync();
+        
+        if (isAuthenticated)
+        {
+            userName = await AuthService.GetUserNameAsync() ?? "Unknown";
+            userEmail = await AuthService.GetUserEmailAsync() ?? "Unknown";
+            userRole = await AuthService.GetUserRoleAsync() ?? "User";
+            registrationDate = await AuthService.GetRegistrationDateAsync();
+            lastLoginDate = await AuthService.GetLastLoginDateAsync();
+            dateOfBirth = await AuthService.GetDateOfBirthAsync();
+            
+            newUserName = userName;
+            newDateOfBirth = dateOfBirth;
+        }
+        
+        isLoaded = true;
+    }
+
+    private async Task HandleUpdateUsername()
+    {
+        if (string.IsNullOrWhiteSpace(newUserName) || newUserName.Length < 3)
+        {
+            Notify.Show("Username must be at least 3 characters", "error");
+            return;
+        }
+        
+        if (newUserName.Trim() == userName)
+        {
+            Notify.Show("New username is the same as current", "info");
+            return;
+        }
+        
+        isUpdatingName = true;
+        StateHasChanged();
+        
+        try
+        {
+            var success = await AuthService.UpdateUserNameAsync(newUserName.Trim());
+            if (success)
+            {
+                userName = newUserName.Trim();
+            }
+        }
+        finally
+        {
+            isUpdatingName = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task HandleUpdateDateOfBirth()
+    {
+        if (newDateOfBirth.HasValue && newDateOfBirth.Value > DateTime.UtcNow)
+        {
+            Notify.Show("Date of birth cannot be in the future", "error");
+            return;
+        }
+        
+        isUpdatingDob = true;
+        StateHasChanged();
+        
+        try
+        {
+            var success = await AuthService.UpdateDateOfBirthAsync(newDateOfBirth);
+            if (success)
+            {
+                dateOfBirth = newDateOfBirth;
+            }
+        }
+        finally
+        {
+            isUpdatingDob = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task HandleLogout()
+    {
+        await AuthService.LogoutAsync();
+        Nav.NavigateTo("/");
+    }
+}

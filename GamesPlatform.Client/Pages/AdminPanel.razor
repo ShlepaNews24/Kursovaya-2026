@@ -1,0 +1,178 @@
+@* [НАЗНАЧЕНИЕ] Панель администратора *@
+@* [ФАЙЛ] Pages/AdminPanel.razor *@
+@page "/admin"
+@inject IAuthService AuthService
+@inject INotificationService Notify
+@inject NavigationManager Nav
+
+<PageTitle><span>Admin Panel</span></PageTitle>
+
+@if (!isLoaded)
+{
+    <div class="text-center py-5">
+        <div class="spinner-border text-primary"></div>
+        <p class="mt-2"><span>Loading...</span></p>
+    </div>
+}
+else if (!isAuthenticated || userRole != "Admin")
+{
+    <div class="alert alert-danger"><span>Access denied. Admin role required.</span></div>
+}
+else
+{
+    <h3><span>Admin Panel</span></h3>
+    
+    <ul class="nav nav-tabs mb-3">
+        <li class="nav-item">
+            <a class="@(activeTab == "users" ? "nav-link active" : "nav-link")" 
+               @onclick='() => activeTab = "users"'>
+                <span>Users</span>
+            </a>
+        </li>
+    </ul>
+    
+    @if (activeTab == "users")
+    {
+        @if (users == null)
+        {
+            <div class="alert alert-warning"><span>Failed to load users</span></div>
+        }
+        else if (!users.Any())
+        {
+            <div class="alert alert-info"><span>No users found</span></div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-striped table-hover">
+                    <thead>
+                        <tr>
+                            <th><span>ID</span></th>
+                            <th><span>Username</span></th>
+                            <th><span>Email</span></th>
+                            <th><span>Role</span></th>
+                            <th><span>Status</span></th>
+                            <th><span>Reg Date</span></th>
+                            <th><span>Actions</span></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var u in users)
+                        {
+                            <tr>
+                                <td><span>@u.UserId</span></td>
+                                <td><span>@u.UserName</span></td>
+                                <td><span>@u.Email</span></td>
+                                <td>
+                                    <span class="badge @(u.UserType == "Admin" ? "bg-danger" : "bg-primary")">@u.UserType</span>
+                                </td>
+                                <td>
+                                    <span class="badge @(u.IsActive ? "bg-success" : "bg-secondary")">@(u.IsActive ? "Active" : "Blocked")</span>
+                                </td>
+                                <td><span>@u.RegistrationDate.ToShortDateString()</span></td>
+                                <td>
+                                    <div class="btn-group btn-group-sm">
+                                        <button class="btn btn-outline-primary" 
+                                                @onclick="() => ToggleRole(u)" 
+                                                disabled="@(isProcessing || u.UserType == "Admin")">
+                                            <span>Make Admin</span>
+                                        </button>
+                                        <button class="btn btn-outline-warning" 
+                                                @onclick="() => ToggleStatus(u)" 
+                                                disabled="@isProcessing">
+                                            <span>@(u.IsActive ? "Block" : "Unblock")</span>
+                                        </button>
+                                        <button class="btn btn-outline-danger" 
+                                                @onclick="() => ConfirmDelete(u)" 
+                                                disabled="@(isProcessing || u.UserType == "Admin")">
+                                            <span>Delete</span>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    }
+}
+
+@code {
+    private bool isLoaded = false;
+    private bool isAuthenticated = false;
+    private bool isProcessing = false;
+    private string userRole = "";
+    private string activeTab = "users";
+    private List<Models.UserDto>? users; // ✅ Явное указание пространства имён
+    private Models.UserDto? userToDelete; // ✅ Явное указание пространства имён
+
+    protected override async Task OnInitializedAsync()
+    {
+        isAuthenticated = await AuthService.IsAuthenticatedAsync();
+        if (isAuthenticated)
+        {
+            userRole = await AuthService.GetUserRoleAsync() ?? "";
+            if (userRole == "Admin")
+            {
+                users = await AuthService.GetUsersAsync();
+            }
+        }
+        isLoaded = true;
+    }
+
+    private async Task ToggleRole(Models.UserDto user) // ✅ Явное указание пространства имён
+    {
+        isProcessing = true;
+        StateHasChanged();
+        try
+        {
+            var newRole = user.UserType == "Admin" ? "User" : "Admin";
+            if (await AuthService.UpdateUserRoleAsync(user.UserId, newRole))
+            {
+                user.UserType = newRole;
+                StateHasChanged();
+            }
+        }
+        finally { isProcessing = false; StateHasChanged(); }
+    }
+
+    private async Task ToggleStatus(Models.UserDto user) // ✅ Явное указание пространства имён
+    {
+        isProcessing = true;
+        StateHasChanged();
+        try
+        {
+            if (await AuthService.UpdateUserStatusAsync(user.UserId, !user.IsActive))
+            {
+                user.IsActive = !user.IsActive;
+                StateHasChanged();
+            }
+        }
+        finally { isProcessing = false; StateHasChanged(); }
+    }
+
+    private void ConfirmDelete(Models.UserDto user) // ✅ Явное указание пространства имён
+    {
+        userToDelete = user;
+        // Можно добавить модальное окно подтверждения
+        _ = DeleteUser(); // ✅ Добавлен _ = для подавления предупреждения
+    }
+
+    private async Task DeleteUser()
+    {
+        if (userToDelete == null) return;
+        isProcessing = true;
+        StateHasChanged();
+        try
+        {
+            // ✅ Добавлен await
+            if (await AuthService.DeleteUserAsync(userToDelete.UserId))
+            {
+                users?.Remove(userToDelete);
+                StateHasChanged();
+            }
+        }
+        finally { isProcessing = false; userToDelete = null; StateHasChanged(); }
+    }
+}

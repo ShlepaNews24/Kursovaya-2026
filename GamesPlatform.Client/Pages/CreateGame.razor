@@ -1,0 +1,147 @@
+@* [НАЗНАЧЕНИЕ] Страница создания новой игры *@
+@* [ФАЙЛ] Pages/CreateGame.razor *@
+@page "/games/create"
+@inject IGamesService GamesService
+@inject IAuthService AuthService
+@inject INotificationService Notify
+@inject NavigationManager Nav
+
+<PageTitle><span>Create Game</span></PageTitle>
+
+@if (!isAuthenticated)
+{
+    <div class="alert alert-warning">
+        <span>⚠️ <a href="/login"><span>Login</span></a> to create a game.</span>
+    </div>
+}
+else
+{
+    <h3><span>Create New Game</span></h3>
+    
+    <div class="card" style="max-width: 700px;">
+        <div class="card-body">
+            <form @onsubmit="HandleCreateGame">
+                <div class="mb-3">
+                    <label class="form-label"><span>Game Title *</span></label>
+                    <input type="text" class="form-control" @bind="newGame.GameTitle" required maxlength="100" />
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label"><span>Description</span></label>
+                    <textarea class="form-control" @bind="newGame.Description" rows="3" maxlength="500"></textarea>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label"><span>Genre *</span></label>
+                    <select class="form-select" @bind="newGame.GenreId" required>
+                        <option value="">-- Select Genre --</option>
+                        @if (genres?.Any() == true)
+                        {
+                            @foreach (var genre in genres)
+                            {
+                                <option value="@genre.GenreId">@genre.GenreName</option>
+                            }
+                        }
+                        else
+                        {
+                            <option disabled><span>No genres available</span></option>
+                        }
+                    </select>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label"><span>Game URL (iframe) *</span></label>
+                    <input type="url" class="form-control" @bind="newGame.GameUrl" required placeholder="https://..." />
+                    <small class="text-muted"><span>Direct link to the HTML5 game</span></small>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label"><span>Logo URL</span></label>
+                    <input type="url" class="form-control" @bind="newGame.Logo" placeholder="https://..." />
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label"><span>Release Date</span></label>
+                    <input type="date" class="form-control" @bind="newGame.ReleaseDate" />
+                </div>
+                
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary" disabled="@(isSubmitting)">
+                        @if (isSubmitting) 
+                        { 
+                            <span class="spinner-border spinner-border-sm"></span> 
+                            <span>Creating...</span> 
+                        }
+                        else 
+                        { 
+                            <span>Create Game</span> 
+                        }
+                    </button>
+                    
+                    @* ✅ ИСПРАВЛЕНО: 
+                         1. Атрибут @onclick в одинарных кавычках '...'
+                         2. Строка пути "/games" в двойных кавычках "..."
+                    *@
+                    <button type="button" class="btn btn-secondary" @onclick='() => Nav.NavigateTo("/games")'>
+                        <span>Cancel</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+}
+
+@code {
+    private bool isAuthenticated = false;
+    private bool isSubmitting = false;
+    private List<GenreDto>? genres;
+    
+    private GameDto newGame = new()
+    {
+        ReleaseDate = DateTime.UtcNow,
+        ModifiedDate = DateTime.UtcNow
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        isAuthenticated = await AuthService.IsAuthenticatedAsync();
+        if (isAuthenticated)
+        {
+            genres = await GamesService.GetGenresAsync();
+        }
+    }
+
+    private async Task HandleCreateGame()
+    {
+        if (string.IsNullOrWhiteSpace(newGame.GameTitle) || 
+            string.IsNullOrWhiteSpace(newGame.GameUrl) || 
+            newGame.GenreId == 0)
+        {
+            Notify.Show("Please fill in all required fields", "error");
+            return;
+        }
+        
+        if (!Uri.IsWellFormedUriString(newGame.GameUrl, UriKind.Absolute))
+        {
+            Notify.Show("Invalid game URL format", "error");
+            return;
+        }
+        
+        isSubmitting = true;
+        StateHasChanged();
+        
+        try
+        {
+            var success = await GamesService.AddGameAsync(newGame);
+            if (success)
+            {
+                Nav.NavigateTo("/games");
+            }
+        }
+        finally
+        {
+            isSubmitting = false;
+            StateHasChanged();
+        }
+    }
+}

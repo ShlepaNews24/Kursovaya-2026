@@ -1,0 +1,21 @@
+@namespace GamesPlatform.Client.Shared
+@* Компонент индикатора загрузки  *@
+@if (Visible)
+{
+    <div class="text-center py-4">
+        <div class="spinner-border @Class" role="status" style="width: @Size; height: @Size;">
+            <span class="visually-hidden">@Text</span>
+        </div>
+        @if (!string.IsNullOrEmpty(Text))
+        {
+            <p class="mt-2 text-muted">@Text</p>
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public bool Visible { get; set; } = true;
+    [Parameter] public string Class { get; set; } = "text-primary";
+    [Parameter] public string Size { get; set; } = "3rem";
+    [Parameter] public string? Text { get; set; }
+}

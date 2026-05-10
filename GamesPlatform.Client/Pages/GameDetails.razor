@@ -1,0 +1,280 @@
+@* [НАЗНАЧЕНИЕ] Страница деталей игры *@
+@* [ФАЙЛ] Pages/GameDetails.razor *@
+@page "/game/{Id:int}"
+@inject IGamesService GamesService
+@inject IAuthService AuthService
+@inject INotificationService Notify
+@inject NavigationManager Nav
+
+<PageTitle>@(game?.GameTitle ?? "Game")</PageTitle>
+
+@if (isLoading) 
+{ 
+    <div class="text-center py-5">
+        <div class="spinner-border text-primary" role="status"></div>
+        <p class="mt-2"><span>Loading...</span></p>
+    </div>
+}
+else if (game == null) 
+{ 
+    <div class="alert alert-danger"><span>Game not found</span></div> 
+}
+else
+{
+    <div class="row">
+        @* Левая колонка: Логотип и инфо *@
+        <div class="col-md-4 mb-4">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body text-center">
+                    @if (!string.IsNullOrEmpty(game.Logo))
+                    {
+                        <img src="@game.Logo" 
+                             class="mb-3 rounded shadow-sm" 
+                             style="width: 180px; height: 180px; object-fit: cover;" 
+                             alt="@game.GameTitle" />
+                    }
+                    else
+                    {
+                        <div class="mb-3 rounded shadow-sm bg-secondary d-flex align-items-center justify-content-center text-white"
+                             style="width: 180px; height: 180px; margin: 0 auto;">
+                            <span>No Logo</span>
+                        </div>
+                    }
+
+                    <h4 class="card-title"><span>@game.GameTitle</span></h4>
+                    <p class="text-muted small"><span>@game.ReleaseDate.ToShortDateString()</span></p>
+                    
+                    @if (!string.IsNullOrWhiteSpace(game.Description))
+                    {
+                        <div class="alert alert-secondary text-start mt-3">
+                            <small><span>@game.Description</span></small>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        @* Правая колонка: Игра и рейтинг *@
+        <div class="col-md-8">
+            @* Рейтинг *@
+            @if (rating != null)
+            {
+                <div class="mb-3">
+                    <span class="me-2">
+                        @for (int i = 1; i <= 5; i++)
+                        {
+                            <span style="color: @(i <= rating.AverageRating ? "#ffc107" : "#ddd"); font-size: 1.2rem;">★</span>
+                        }
+                    </span>
+                    <span class="text-muted"><span>@rating.AverageRating.ToString("0.0") (@rating.TotalVotes votes)</span></span>
+                </div>
+            }
+            
+            @* Окно игры *@
+            <div class="card mb-4 shadow-sm">
+                <div class="card-header"><h5><span>Play Game</span></h5></div>
+                <div class="card-body">
+                    @if (!string.IsNullOrEmpty(game.GameUrl))
+                    {
+                        <div class="mx-auto" style="max-width: 900px;">
+                            <div class="ratio ratio-16x9 rounded overflow-hidden shadow" style="background: #000;">
+                                <iframe src="@game.GameUrl" 
+                                        sandbox="allow-scripts allow-same-origin allow-pointer-lock allow-forms allow-popups"
+                                        style="border: none; width: 100%; height: 100%;"
+                                        title="@game.GameTitle"
+                                        loading="lazy">
+                                </iframe>
+                            </div>
+                        </div>
+                        
+                        <div class="text-center mt-3">
+                            <a href="@game.GameUrl" 
+                               class="btn btn-outline-primary btn-sm" 
+                               target="_blank" 
+                               rel="noopener noreferrer">
+                                <span>Open in new tab</span>
+                            </a>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="alert alert-warning"><span>No game URL provided.</span></div>
+                    }
+                </div>
+            </div>
+
+            @* Оценка *@
+            <div class="card mb-4 shadow-sm">
+                <div class="card-header"><h5><span>Rate this Game</span></h5></div>
+                <div class="card-body">
+                    @if (isAuthenticated)
+                    {
+                        <div class="d-flex align-items-center">
+                            <span class="me-2"><span>Your rating:</span></span>
+                            @for (int i = 1; i <= 5; i++)
+                            {
+                                var star = i;
+                                <button class="btn btn-link p-0 me-1" 
+                                        @onclick="() => SubmitRating(star)" 
+                                        disabled="@(isRating)">
+                                    <span style="color: @(i <= userRatingValue ? "#ffc107" : "#ddd"); font-size: 1.5rem;">
+                                        @(i <= userRatingValue ? "★" : "☆")
+                                    </span>
+                                </button>
+                            }
+                            @if (isRating)
+                            {
+                                <span class="spinner-border spinner-border-sm ms-2" role="status"></span>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="mb-0"><span><a href="/login"><span>Login</span></a> to rate this game.</span></p>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @* Комментарии *@
+    <div class="card mb-4 shadow-sm">
+        <div class="card-header"><h5><span>Comments (@(comments?.Count ?? 0))</span></h5></div>
+        <div class="card-body">
+            @if (comments?.Any() == true)
+            {
+                <ul class="list-group mb-3">
+                    @foreach (var c in comments)
+                    {
+                        <li class="list-group-item">
+                            <strong><span>@(c.UserName ?? $"User {c.UserId}")</span></strong>: <span>@c.CommentText</span>
+                            <small class="text-muted d-block"><span>@c.CreatedDate.ToShortDateString()</span></small>
+                        </li>
+                    }
+                </ul>
+            }
+            else 
+            { <p class="text-muted mb-3"><span>No comments yet.</span></p> }
+
+            @if (isAuthenticated)
+            {
+                <div class="input-group">
+                    <textarea class="form-control" @bind="newComment" placeholder="Write a comment..." rows="2" maxlength="500"></textarea>
+                    <button class="btn btn-primary" @onclick="AddComment" disabled="@(string.IsNullOrWhiteSpace(newComment))">
+                        <span>Send</span>
+                    </button>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+    
+    private GameDto? game;
+    private List<CommentDto>? comments = new();
+    private RatingSummaryDto? rating; // ✅ Правильный тип, не bool
+    private string newComment = "";
+    private bool isLoading = true;
+    private bool isAuthenticated = false;
+    private bool isRating = false;
+    private int userRatingValue = 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        isLoading = true;
+        StateHasChanged();
+        
+        try
+        {
+            game = await GamesService.GetGameAsync(Id);
+            comments = await GamesService.GetCommentsAsync(Id) ?? new();
+            
+            // ✅ Правильное получение рейтинга
+            var ratingResult = await GamesService.GetRatingAsync(Id);
+            if (ratingResult != null)
+            {
+                rating = ratingResult;
+                if (rating.UserRating.HasValue)
+                    userRatingValue = rating.UserRating.Value;
+            }
+            
+            isAuthenticated = await AuthService.IsAuthenticatedAsync();
+        }
+        catch (Exception ex)
+        {
+            Notify.Show($"Error loading game: {ex.Message}", "error");
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task SubmitRating(int value)
+    {
+        if (isRating) return;
+        
+        isRating = true;
+        StateHasChanged();
+        
+        try
+        {
+            var result = await GamesService.AddRatingAsync(Id, value);
+            if (result)
+            {
+                // Перезагружаем рейтинг после отправки
+                var ratingResult = await GamesService.GetRatingAsync(Id);
+                if (ratingResult != null)
+                {
+                    rating = ratingResult;
+                    userRatingValue = value;
+                }
+            }
+        }
+        finally
+        {
+            isRating = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task AddComment()
+    {
+        if (string.IsNullOrWhiteSpace(newComment)) return;
+        
+        var userIdStr = await AuthService.GetUserIdAsync();
+        
+        if (string.IsNullOrEmpty(userIdStr) || !int.TryParse(userIdStr, out var userId))
+        {
+            Notify.Show("Error: user not identified. Please re-login.", "error");
+            return;
+        }
+        
+        var success = await GamesService.AddCommentAsync(new CommentDto 
+        { 
+            GameId = Id, 
+            UserId = userId, 
+            CommentText = newComment.Trim(), 
+            CreatedDate = DateTime.UtcNow 
+        });
+        
+        if (success) 
+        { 
+            var userName = await AuthService.GetUserNameAsync() ?? "You";
+            
+            comments?.Add(new CommentDto 
+            { 
+                CommentText = newComment.Trim(), 
+                UserId = userId, 
+                CreatedDate = DateTime.UtcNow,
+                UserName = userName 
+            }); 
+            
+            newComment = ""; 
+            StateHasChanged(); 
+        }
+    }
+}

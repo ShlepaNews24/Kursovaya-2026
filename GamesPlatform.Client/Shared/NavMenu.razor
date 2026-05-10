@@ -1,0 +1,82 @@
+<div class="top-row ps-3 navbar navbar-dark">
+    <div class="container-fluid">
+        <a class="navbar-brand" href=""><span>Games Platform</span></a>
+    </div>
+</div>
+
+<div class="nav-menu">
+    <ul class="nav flex-column">
+        <li class="nav-item px-3">
+            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
+                <span class="bi bi-house-door-fill"></span> <span>Home</span>
+            </NavLink>
+        </li>
+        <li class="nav-item px-3">
+            <NavLink class="nav-link" href="games">
+                <span class="bi bi-list"></span> <span>Games</span>
+            </NavLink>
+        </li>
+        @if (IsAuthenticated)
+        {
+            <li class="nav-item px-3">
+                <NavLink class="nav-link" href="games/create">
+                    <span class="bi bi-plus-circle"></span> <span>Add Game</span>
+                </NavLink>
+            </li>
+            <li class="nav-item px-3">
+                <NavLink class="nav-link" href="profile">
+                    <span class="bi bi-person"></span> <span>Profile</span>
+                </NavLink>
+            </li>
+            @if (UserRole == "Admin")
+            {
+                <li class="nav-item px-3">
+                    <NavLink class="nav-link" href="admin">
+                        <span class="bi bi-shield-lock"></span> <span>Admin Panel</span>
+                    </NavLink>
+                </li>
+            }
+            <li class="nav-item px-3">
+                <button class="btn btn-link nav-link" @onclick="Logout">
+                    <span class="bi bi-box-arrow-right"></span> <span>Logout</span>
+                </button>
+            </li>
+        }
+        else
+        {
+            <li class="nav-item px-3">
+                <NavLink class="nav-link" href="login">
+                    <span class="bi bi-box-arrow-in-right"></span> <span>Login</span>
+                </NavLink>
+            </li>
+        }
+    </ul>
+</div>
+
+@code {
+    private bool IsAuthenticated = false;
+    private string UserRole = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CheckAuth();
+    }
+
+    private async Task CheckAuth()
+    {
+        IsAuthenticated = await AuthService.IsAuthenticatedAsync();
+        if (IsAuthenticated)
+        {
+            UserRole = await AuthService.GetUserRoleAsync() ?? "";
+        }
+    }
+
+    private async Task Logout()
+    {
+        await AuthService.LogoutAsync();
+        Nav.NavigateTo("/");
+    }
+
+    [Inject] public IAuthService AuthService { get; set; } = null!;
+    [Inject] public NavigationManager Nav { get; set; } = null!;
+}
