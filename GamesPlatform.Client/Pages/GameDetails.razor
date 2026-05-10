@@ -56,20 +56,48 @@ else
 
         @* Правая колонка: Игра и рейтинг *@
         <div class="col-md-8">
-            @* Рейтинг *@
-            @if (rating != null)
-            {
-                <div class="mb-3">
-                    <span class="me-2">
-                        @for (int i = 1; i <= 5; i++)
-                        {
-                            <span style="color: @(i <= rating.AverageRating ? "#ffc107" : "#ddd"); font-size: 1.2rem;">★</span>
-                        }
-                    </span>
-                    <span class="text-muted"><span>@rating.AverageRating.ToString("0.0") (@rating.TotalVotes votes)</span></span>
+            @* ✅ РЕЙТИНГ: Вернут оригинальный вид звёздочек *@
+            <div class="card mb-4 shadow-sm">
+                <div class="card-header"><h5><span>Rate this Game</span></h5></div>
+                <div class="card-body">
+                    @if (rating != null)
+                    {
+                        <div class="mb-3">
+                            <span class="me-2">
+                                @for (int i = 1; i <= 5; i++)
+                                {
+                                    <span style="color: @(i <= rating.AverageRating ? "#ffc107" : "#ddd"); font-size: 1.2rem;">★</span>
+                                }
+                            </span>
+                            <span class="text-muted"><span>@rating.AverageRating.ToString("0.0") (@rating.TotalVotes votes)</span></span>
+                        </div>
+                    }
+                    
+                    @if (isAuthenticated)
+                    {
+                        <div class="d-flex align-items-center">
+                            <span class="me-2"><span>Your rating:</span></span>
+                            @for (int i = 1; i <= 5; i++)
+                            {
+                                var star = i;
+                                <span style="cursor: pointer; font-size: 1.5rem; color: @(i <= userRatingValue ? "#ffc107" : "#ddd"); margin-right: 5px;"
+                                      @onclick="() => SubmitRating(star)">
+                                    @(i <= userRatingValue ? "★" : "☆")
+                                </span>
+                            }
+                            @if (isRating)
+                            {
+                                <span class="spinner-border spinner-border-sm ms-2 text-warning" role="status"></span>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="mb-0"><span><a href="/login"><span>Login</span></a> to rate this game.</span></p>
+                    }
                 </div>
-            }
-            
+            </div>
+
             @* Окно игры *@
             <div class="card mb-4 shadow-sm">
                 <div class="card-header"><h5><span>Play Game</span></h5></div>
@@ -86,12 +114,8 @@ else
                                 </iframe>
                             </div>
                         </div>
-                        
                         <div class="text-center mt-3">
-                            <a href="@game.GameUrl" 
-                               class="btn btn-outline-primary btn-sm" 
-                               target="_blank" 
-                               rel="noopener noreferrer">
+                            <a href="@game.GameUrl" class="btn btn-outline-primary btn-sm" target="_blank">
                                 <span>Open in new tab</span>
                             </a>
                         </div>
@@ -99,38 +123,6 @@ else
                     else
                     {
                         <div class="alert alert-warning"><span>No game URL provided.</span></div>
-                    }
-                </div>
-            </div>
-
-            @* Оценка *@
-            <div class="card mb-4 shadow-sm">
-                <div class="card-header"><h5><span>Rate this Game</span></h5></div>
-                <div class="card-body">
-                    @if (isAuthenticated)
-                    {
-                        <div class="d-flex align-items-center">
-                            <span class="me-2"><span>Your rating:</span></span>
-                            @for (int i = 1; i <= 5; i++)
-                            {
-                                var star = i;
-                                <button class="btn btn-link p-0 me-1" 
-                                        @onclick="() => SubmitRating(star)" 
-                                        disabled="@(isRating)">
-                                    <span style="color: @(i <= userRatingValue ? "#ffc107" : "#ddd"); font-size: 1.5rem;">
-                                        @(i <= userRatingValue ? "★" : "☆")
-                                    </span>
-                                </button>
-                            }
-                            @if (isRating)
-                            {
-                                <span class="spinner-border spinner-border-sm ms-2" role="status"></span>
-                            }
-                        </div>
-                    }
-                    else
-                    {
-                        <p class="mb-0"><span><a href="/login"><span>Login</span></a> to rate this game.</span></p>
                     }
                 </div>
             </div>
@@ -174,14 +166,16 @@ else
     
     private GameDto? game;
     private List<CommentDto>? comments = new();
-    private RatingSummaryDto? rating; // ✅ Правильный тип, не bool
+    private RatingSummaryDto? rating;
     private string newComment = "";
     private bool isLoading = true;
     private bool isAuthenticated = false;
     private bool isRating = false;
     private int userRatingValue = 0;
 
-    protected override async Task OnInitializedAsync()
+    protected override async Task OnInitializedAsync() => await LoadGameData();
+
+    private async Task LoadGameData()
     {
         isLoading = true;
         StateHasChanged();
@@ -191,7 +185,6 @@ else
             game = await GamesService.GetGameAsync(Id);
             comments = await GamesService.GetCommentsAsync(Id) ?? new();
             
-            // ✅ Правильное получение рейтинга
             var ratingResult = await GamesService.GetRatingAsync(Id);
             if (ratingResult != null)
             {
@@ -215,21 +208,22 @@ else
 
     private async Task SubmitRating(int value)
     {
-        if (isRating) return;
+        if (isRating || !isAuthenticated) return;
         
         isRating = true;
         StateHasChanged();
         
         try
         {
-            var result = await GamesService.AddRatingAsync(Id, value);
-            if (result)
+            // ✅ Сервис теперь возвращает true/false и показывает точную ошибку
+            var success = await GamesService.AddRatingAsync(Id, value);
+            
+            if (success)
             {
-                // Перезагружаем рейтинг после отправки
-                var ratingResult = await GamesService.GetRatingAsync(Id);
-                if (ratingResult != null)
+                var newRating = await GamesService.GetRatingAsync(Id);
+                if (newRating != null)
                 {
-                    rating = ratingResult;
+                    rating = newRating;
                     userRatingValue = value;
                 }
             }
@@ -246,33 +240,21 @@ else
         if (string.IsNullOrWhiteSpace(newComment)) return;
         
         var userIdStr = await AuthService.GetUserIdAsync();
-        
         if (string.IsNullOrEmpty(userIdStr) || !int.TryParse(userIdStr, out var userId))
         {
-            Notify.Show("Error: user not identified. Please re-login.", "error");
+            Notify.Show("Error: user not identified", "error");
             return;
         }
         
         var success = await GamesService.AddCommentAsync(new CommentDto 
         { 
-            GameId = Id, 
-            UserId = userId, 
-            CommentText = newComment.Trim(), 
-            CreatedDate = DateTime.UtcNow 
+            GameId = Id, UserId = userId, CommentText = newComment.Trim(), CreatedDate = DateTime.UtcNow 
         });
         
         if (success) 
         { 
             var userName = await AuthService.GetUserNameAsync() ?? "You";
-            
-            comments?.Add(new CommentDto 
-            { 
-                CommentText = newComment.Trim(), 
-                UserId = userId, 
-                CreatedDate = DateTime.UtcNow,
-                UserName = userName 
-            }); 
-            
+            comments?.Add(new CommentDto { CommentText = newComment.Trim(), UserId = userId, CreatedDate = DateTime.UtcNow, UserName = userName }); 
             newComment = ""; 
             StateHasChanged(); 
         }
