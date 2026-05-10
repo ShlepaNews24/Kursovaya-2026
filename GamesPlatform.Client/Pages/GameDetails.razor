@@ -1,4 +1,4 @@
-@* [НАЗНАЧЕНИЕ] Страница деталей игры *@
+@* [НАЗНАЧЕНИЕ] Страница деталей игры с рабочим рейтингом *@
 @* [ФАЙЛ] Pages/GameDetails.razor *@
 @page "/game/{Id:int}"
 @inject IGamesService GamesService
@@ -22,7 +22,7 @@ else if (game == null)
 else
 {
     <div class="row">
-        @* Левая колонка: Логотип и инфо *@
+        @* Левая колонка: Инфо *@
         <div class="col-md-4 mb-4">
             <div class="card h-100 shadow-sm">
                 <div class="card-body text-center">
@@ -54,22 +54,69 @@ else
             </div>
         </div>
 
-        @* Правая колонка: Игра и рейтинг *@
+        @* Правая колонка: Игра и РЕЙТИНГ *@
         <div class="col-md-8">
-            @* Рейтинг *@
-            @if (rating != null)
-            {
-                <div class="mb-3">
-                    <span class="me-2">
-                        @for (int i = 1; i <= 5; i++)
-                        {
-                            <span style="color: @(i <= rating.AverageRating ? "#ffc107" : "#ddd"); font-size: 1.2rem;">★</span>
-                        }
-                    </span>
-                    <span class="text-muted"><span>@rating.AverageRating.ToString("0.0") (@rating.TotalVotes votes)</span></span>
-                </div>
-            }
             
+            @* ✅ БЛОК РЕЙТИНГА (Исправлен) *@
+            <div class="card mb-4 shadow-sm border-warning">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0"><span>⭐ Rate this Game</span></h5>
+                </div>
+                <div class="card-body">
+                    @if (rating != null)
+                    {
+                        <div class="mb-3 text-center">
+                            <span class="me-2 h4">
+                                @for (int i = 1; i <= 5; i++)
+                                {
+                                    <span style="color: @(i <= rating.AverageRating ? "#ffc107" : "#ddd"); font-size: 1.5rem;">★</span>
+                                }
+                            </span>
+                            <div class="text-muted">
+                                <span>@rating.AverageRating.ToString("0.0") из 5</span> 
+                                <small>(@rating.TotalVotes голосов)</small>
+                            </div>
+                            @if (rating.UserRating.HasValue)
+                            {
+                                <div class="mt-1 text-success small">
+                                    <span>Ваша оценка: @rating.UserRating.Value ★</span>
+                                </div>
+                            }
+                        </div>
+                    }
+                    
+                    @if (isAuthenticated)
+                    {
+                        <hr />
+                        <div class="text-center">
+                            <p class="mb-2"><span>Ваша оценка:</span></p>
+                            <div class="btn-group" role="group">
+                                @for (int i = 1; i <= 5; i++)
+                                {
+                                    var starValue = i;
+                                    <button type="button" 
+                                            class="btn btn-outline-warning @(i <= userRatingValue ? "active" : "")"
+                                            @onclick="() => SubmitRating(starValue)"
+                                            disabled="@isRating">
+                                        <span>★ @i</span>
+                                    </button>
+                                }
+                            </div>
+                            @if (isRating)
+                            {
+                                <span class="spinner-border spinner-border-sm ms-2 text-warning" role="status"></span>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="mb-0 text-center text-muted">
+                            <span><a href="/login"><span>Войдите</span></a>, чтобы оценить игру.</span>
+                        </p>
+                    }
+                </div>
+            </div>
+
             @* Окно игры *@
             <div class="card mb-4 shadow-sm">
                 <div class="card-header"><h5><span>Play Game</span></h5></div>
@@ -86,12 +133,8 @@ else
                                 </iframe>
                             </div>
                         </div>
-                        
                         <div class="text-center mt-3">
-                            <a href="@game.GameUrl" 
-                               class="btn btn-outline-primary btn-sm" 
-                               target="_blank" 
-                               rel="noopener noreferrer">
+                            <a href="@game.GameUrl" class="btn btn-outline-primary btn-sm" target="_blank">
                                 <span>Open in new tab</span>
                             </a>
                         </div>
@@ -99,38 +142,6 @@ else
                     else
                     {
                         <div class="alert alert-warning"><span>No game URL provided.</span></div>
-                    }
-                </div>
-            </div>
-
-            @* Оценка *@
-            <div class="card mb-4 shadow-sm">
-                <div class="card-header"><h5><span>Rate this Game</span></h5></div>
-                <div class="card-body">
-                    @if (isAuthenticated)
-                    {
-                        <div class="d-flex align-items-center">
-                            <span class="me-2"><span>Your rating:</span></span>
-                            @for (int i = 1; i <= 5; i++)
-                            {
-                                var star = i;
-                                <button class="btn btn-link p-0 me-1" 
-                                        @onclick="() => SubmitRating(star)" 
-                                        disabled="@(isRating)">
-                                    <span style="color: @(i <= userRatingValue ? "#ffc107" : "#ddd"); font-size: 1.5rem;">
-                                        @(i <= userRatingValue ? "★" : "☆")
-                                    </span>
-                                </button>
-                            }
-                            @if (isRating)
-                            {
-                                <span class="spinner-border spinner-border-sm ms-2" role="status"></span>
-                            }
-                        </div>
-                    }
-                    else
-                    {
-                        <p class="mb-0"><span><a href="/login"><span>Login</span></a> to rate this game.</span></p>
                     }
                 </div>
             </div>
@@ -174,14 +185,22 @@ else
     
     private GameDto? game;
     private List<CommentDto>? comments = new();
-    private RatingSummaryDto? rating; // ✅ Правильный тип, не bool
+    
+    // ✅ Правильный тип для рейтинга
+    private RatingSummaryDto? rating; 
+    
     private string newComment = "";
     private bool isLoading = true;
     private bool isAuthenticated = false;
     private bool isRating = false;
-    private int userRatingValue = 0;
+    private int userRatingValue = 0; // Текущая выбранная оценка (1-5)
 
     protected override async Task OnInitializedAsync()
+    {
+        await LoadGameData();
+    }
+
+    private async Task LoadGameData()
     {
         isLoading = true;
         StateHasChanged();
@@ -191,20 +210,18 @@ else
             game = await GamesService.GetGameAsync(Id);
             comments = await GamesService.GetCommentsAsync(Id) ?? new();
             
-            // ✅ Правильное получение рейтинга
-            var ratingResult = await GamesService.GetRatingAsync(Id);
-            if (ratingResult != null)
+            // Загружаем рейтинг
+            rating = await GamesService.GetRatingAsync(Id);
+            if (rating?.UserRating.HasValue == true)
             {
-                rating = ratingResult;
-                if (rating.UserRating.HasValue)
-                    userRatingValue = rating.UserRating.Value;
+                userRatingValue = rating.UserRating.Value;
             }
             
             isAuthenticated = await AuthService.IsAuthenticatedAsync();
         }
         catch (Exception ex)
         {
-            Notify.Show($"Error loading game: {ex.Message}", "error");
+            Notify.Show($"Error: {ex.Message}", "error");
         }
         finally
         {
@@ -213,26 +230,38 @@ else
         }
     }
 
+    // ✅ Метод отправки рейтинга
     private async Task SubmitRating(int value)
     {
-        if (isRating) return;
+        if (isRating || !isAuthenticated) return;
         
         isRating = true;
         StateHasChanged();
         
         try
         {
-            var result = await GamesService.AddRatingAsync(Id, value);
-            if (result)
+            bool success = await GamesService.AddRatingAsync(Id, value);
+            
+            if (success)
             {
-                // Перезагружаем рейтинг после отправки
-                var ratingResult = await GamesService.GetRatingAsync(Id);
-                if (ratingResult != null)
+                Notify.Show("Спасибо за оценку!", "success");
+                
+                // ✅ Перезагружаем данные рейтинга с сервера, чтобы увидеть новое среднее
+                var newRating = await GamesService.GetRatingAsync(Id);
+                if (newRating != null)
                 {
-                    rating = ratingResult;
-                    userRatingValue = value;
+                    rating = newRating;
+                    userRatingValue = value; // Обновляем визуальное выделение
                 }
             }
+            else
+            {
+                Notify.Show("Не удалось отправить оценку", "error");
+            }
+        }
+        catch (Exception ex)
+        {
+            Notify.Show($"Ошибка: {ex.Message}", "error");
         }
         finally
         {
@@ -246,10 +275,9 @@ else
         if (string.IsNullOrWhiteSpace(newComment)) return;
         
         var userIdStr = await AuthService.GetUserIdAsync();
-        
         if (string.IsNullOrEmpty(userIdStr) || !int.TryParse(userIdStr, out var userId))
         {
-            Notify.Show("Error: user not identified. Please re-login.", "error");
+            Notify.Show("Error: user not identified", "error");
             return;
         }
         
@@ -264,7 +292,6 @@ else
         if (success) 
         { 
             var userName = await AuthService.GetUserNameAsync() ?? "You";
-            
             comments?.Add(new CommentDto 
             { 
                 CommentText = newComment.Trim(), 
@@ -272,7 +299,6 @@ else
                 CreatedDate = DateTime.UtcNow,
                 UserName = userName 
             }); 
-            
             newComment = ""; 
             StateHasChanged(); 
         }
