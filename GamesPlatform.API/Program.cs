@@ -1,26 +1,31 @@
+// [ФАЙЛ] GamesPlatform.API/Program.cs
 using Serilog;
 using Serilog.Events;
 using Microsoft.EntityFrameworkCore;
-using GamesPlatform.API.Data;
 using Microsoft.OpenApi.Models;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
+using System.Text;
+
+using GamesPlatform.API.Data;
 using GamesPlatform.API.Features.Auth;
 using GamesPlatform.API.Interfaces;
 using GamesPlatform.API.Repositories;
-using Microsoft.Extensions.Logging;
 
-// ✅ 1. Инициализация Serilog ДО создания builder
+// ============================================================================
+// 🔍 1. ИНИЦИАЛИЗАЦИЯ SERILOG (ДО создания builder)
+// ============================================================================
 Log.Logger = new LoggerConfiguration()
     .MinimumLevel.Override("Microsoft", LogEventLevel.Information)
+    .MinimumLevel.Override("Microsoft.EntityFrameworkCore", LogEventLevel.Warning)
     .Enrich.FromLogContext()
-    .Enrich.WithMachineName()
     .WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}")
-    .WriteTo.File("logs/log-.txt", 
-        rollingInterval: RollingInterval.Day, 
+    .WriteTo.File("logs/log-.txt",
+        rollingInterval: RollingInterval.Day,
         retainedFileCountLimit: 7,
-        outputTemplate: "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz}] [{Level:u3}] {Message:lj}{NewLine}{Exception}")
+        outputTemplate: "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz}] [{Level:u3}] {Message:lj}{NewLine}{Exception}",
+        shared: true)
     .CreateLogger();
 
 try
@@ -29,16 +34,19 @@ try
 
     var builder = WebApplication.CreateBuilder(args);
 
-    // ✅ 2. Подключаем Serilog к хосту
+    // ✅ Подключаем Serilog к хосту
     builder.Host.UseSerilog();
 
-    // --- Сервисы ---
-    builder.Services.AddScoped<IAuthService, AuthService>();
-    builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
-    builder.Services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
+    // ============================================================================
+    // 🗄️ 2. БАЗА ДАННЫХ
+    // ============================================================================
+    builder.Services.AddDbContext<AppDbContext>(options =>
+        options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-    // --- Аутентификация (JWT) ---
-    builder.Services.AddAuthentication("Bearer")
+    // ============================================================================
+    // 🔐 3. JWT АУТЕНТИФИКАЦИЯ (соответствует вашему AuthService.cs)
+    // ============================================================================
+    builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         .AddJwtBearer(options =>
         {
             options.TokenValidationParameters = new TokenValidationParameters
@@ -49,18 +57,22 @@ try
                 ValidateIssuerSigningKey = true,
                 ValidIssuer = builder.Configuration["JwtSettings:Issuer"],
                 ValidAudience = builder.Configuration["JwtSettings:Audience"],
-                IssuerSigningKey = new SymmetricSecurityKey(
-                    System.Text.Encoding.UTF8.GetBytes(builder.Configuration["JwtSettings:SecretKey"]!))
+                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["JwtSettings:SecretKey"]))
             };
         });
 
     builder.Services.AddAuthorization();
 
-    // --- База данных ---
-    builder.Services.AddDbContext<AppDbContext>(options =>
-        options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
+    // ============================================================================
+    // 🏗️ 4. DEPENDENCY INJECTION
+    // ============================================================================
+    builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
+    builder.Services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
+    builder.Services.AddScoped<IAuthService, AuthService>();
 
-    // --- Контроллеры & JSON ---
+    // ============================================================================
+    // 🎮 5. КОНТРОЛЛЕРЫ + JSON + CORS
+    // ============================================================================
     builder.Services.AddControllers()
         .AddJsonOptions(options =>
         {
@@ -68,18 +80,15 @@ try
             options.JsonSerializerOptions.WriteIndented = false;
         });
 
-    // --- CORS ---
     builder.Services.AddCors(options =>
     {
         options.AddPolicy("AllowAll", policy =>
-        {
-            policy.AllowAnyOrigin()
-                  .AllowAnyMethod()
-                  .AllowAnyHeader();
-        });
+            policy.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader());
     });
 
-    // --- Swagger ---
+    // ============================================================================
+    // 📖 6. SWAGGER + JWT SUPPORT
+    // ============================================================================
     builder.Services.AddEndpointsApiExplorer();
     builder.Services.AddSwaggerGen(c =>
     {
@@ -89,6 +98,7 @@ try
             Version = "v1",
             Description = "API для платформы браузерных игр"
         });
+
         c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
         {
             In = ParameterLocation.Header,
@@ -98,16 +108,13 @@ try
             Scheme = "bearer",
             BearerFormat = "JWT"
         });
+
         c.AddSecurityRequirement(new OpenApiSecurityRequirement
         {
             {
                 new OpenApiSecurityScheme
                 {
-                    Reference = new OpenApiReference 
-                    { 
-                        Type = ReferenceType.SecurityScheme, 
-                        Id = "Bearer" 
-                    }
+                    Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "Bearer" }
                 },
                 Array.Empty<string>()
             }
@@ -116,15 +123,13 @@ try
 
     var app = builder.Build();
 
-    // --- Middleware ---
+    // ============================================================================
+    // 🚀 7. MIDDLEWARE PIPELINE
+    // ============================================================================
     if (app.Environment.IsDevelopment())
     {
         app.UseSwagger();
-        app.UseSwaggerUI(c =>
-        {
-            c.SwaggerEndpoint("/swagger/v1/swagger.json", "Games Platform API v1");
-            c.RoutePrefix = string.Empty;
-        });
+        app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "Games Platform API v1"));
     }
 
     app.UseHttpsRedirection();
@@ -134,21 +139,25 @@ try
     app.UseAuthorization();
     app.MapControllers();
 
-    // --- Инициализация БД ---
+    // ============================================================================
+    // 🗄️ 8. ИНИЦИАЛИЗАЦИЯ БД (EnsureCreated закомментирован)
+    // ============================================================================
     using (var scope = app.Services.CreateScope())
     {
-        var services = scope.ServiceProvider;
-        var context = services.GetRequiredService<AppDbContext>();
-        context.Database.EnsureCreated();
-        Log.Information("✅ Database initialized");
+        var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        
+        // ⛔ Закомментировано по вашему запросу. 
+        // Теперь БД управляется только через миграции: dotnet ef database update
+        // context.Database.EnsureCreated(); 
     }
 
-    Log.Information("🌐 Server is running on {Url}", app.Urls.FirstOrDefault() ?? "Unknown");
+    Log.Information("🌐 Server is running on: {Urls}", string.Join(", ", app.Urls));
     app.Run();
 }
 catch (Exception ex)
 {
     Log.Fatal(ex, "💀 Application terminated unexpectedly");
+    throw;
 }
 finally
 {
