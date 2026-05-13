@@ -1,124 +1,114 @@
-using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Mvc;
+using Moq;
+using Microsoft.Extensions.Logging;
+using Microsoft.AspNetCore.Http; // ✅ Для DefaultHttpContext
+using System.Security.Claims;    // ✅ Для ClaimsPrincipal
 using GamesPlatform.API.Controllers;
-using GamesPlatform.API.Data;
 using GamesPlatform.API.Models;
+using GamesPlatform.API.Interfaces;
 using Xunit;
-using System.Collections.Generic;  
+using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace GamesPlatform.Tests
 {
     public class GamesControllerTests
     {
-        // Создание in-memory базы данных для тестов
-        // Каждый тест получает изолированную БД
-        private AppDbContext GetInMemoryContext()
+        private readonly Mock<IUnitOfWork> _mockUow;
+        private readonly Mock<ILogger<GamesController>> _mockLogger;
+        private readonly GamesController _controller;
+
+        public GamesControllerTests()
         {
-            var options = new DbContextOptionsBuilder<AppDbContext>()
-                .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
-                .Options;
-            return new AppDbContext(options);
+            _mockUow = new Mock<IUnitOfWork>();
+            _mockLogger = new Mock<ILogger<GamesController>>();
+            _controller = new GamesController(_mockUow.Object, _mockLogger.Object);
         }
 
-        // [НАЗНАЧЕНИЕ] Тест: GET /api/games возвращает список игр
         [Fact]
         public async Task GetGames_ReturnsOkResult_WithListOfGames()
         {
-            // arrange
-            var context = GetInMemoryContext();
-            
-            // Сначала добавляем связанные сущности, на которые ссылается Game
-            context.Genres.Add(new Genre { GenreId = 1, GenreName = "Action" });
-            context.Users.Add(new User 
-            { 
-                UserId = 1, 
-                UserName = "TestDev", 
-                Email = "dev@test.com", 
-                PasswordHash = "hash123" 
-            });
-            await context.SaveChangesAsync();  // Сохраняем, чтобы присвоились ID
-            
-            // Теперь добавляем игру с валидными внешними ключами
-            context.Games.Add(new Game 
-            { 
-                GameId = 1, 
-                GameTitle = "Test Game", 
-                GenreId = 1,           // ← Ссылается на существующий Genre
-                DeveloperId = 1,       // ← Ссылается на существующего User
-                ReleaseDate = DateTime.UtcNow 
-            });
-            await context.SaveChangesAsync();
+            var expectedGames = new List<Game>
+            {
+                new Game { GameId = 1, GameTitle = "Test Game", GenreId = 1, DeveloperId = 1 }
+            };
 
-            var controller = new GamesController(context);
+            var mockGamesRepo = new Mock<IRepository<Game>>();
+            mockGamesRepo.Setup(r => r.GetAllAsync()).ReturnsAsync(expectedGames);
+            _mockUow.Setup(u => u.Games).Returns(mockGamesRepo.Object);
 
-            // act
-            var result = await controller.GetGames();
+            var query = new GamesQueryDto { PageNumber = 1, PageSize = 10 };
 
-            // assert
-            // Извлекаем список игр из ActionResult<T>.Value
-            var games = Assert.IsAssignableFrom<IEnumerable<Game>>(result.Value);
+            var result = await _controller.GetGames(query);
+
+            var okResult = Assert.IsType<OkObjectResult>(result.Result);
+            var pagedResult = Assert.IsType<PagedResult<GameDto>>(okResult.Value);
             
-            // Проверяем, что список не пустой и содержит нашу игру
-            Assert.NotEmpty(games);
-            Assert.Contains(games, g => g.GameTitle == "Test Game");
+            Assert.NotEmpty(pagedResult.Items);
+            Assert.Contains(pagedResult.Items, g => g.GameTitle == "Test Game");
         }
 
-        // Тест: POST создаёт игру и возвращает 201 Created
         [Fact]
         public async Task PostGame_ReturnsCreatedAtActionResult_WhenValid()
         {
-            // arrange
-            var context = GetInMemoryContext();
-            var controller = new GamesController(context);
+            // ✅ 1. Настраиваем авторизованного пользователя для теста
+            var userIdClaim = new Claim(ClaimTypes.NameIdentifier, "1");
+            var claimsIdentity = new ClaimsIdentity(new[] { userIdClaim }, "TestAuth");
+            var claimsPrincipal = new ClaimsPrincipal(claimsIdentity);
             
-            // Предварительно создаём жанр и разработчика
-            context.Genres.Add(new Genre { GenreId = 1, GenreName = "Action" });
-            context.Users.Add(new User 
-            { 
-                UserId = 1, 
-                UserName = "Dev", 
-                Email = "dev@test.com", 
-                PasswordHash = "hash" 
-            });
-            await context.SaveChangesAsync();
+            _controller.ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext { User = claimsPrincipal }
+            };
 
+            // ✅ 2. Готовим тестовые данные
             var newGame = new Game 
             { 
+                GameId = 0,
                 GameTitle = "New Game", 
                 GenreId = 1, 
                 DeveloperId = 1,
-                ReleaseDate = DateTime.UtcNow
+                GameUrl = "https://example.com",
+                ReleaseDate = System.DateTime.UtcNow,
+                ModifiedDate = System.DateTime.UtcNow
             };
 
-            // act
-            var result = await controller.PostGame(newGame);
+            // ✅ 3. Настраиваем моки
+            var mockGenresRepo = new Mock<IRepository<Genre>>();
+            mockGenresRepo.Setup(r => r.ExistsAsync(1)).ReturnsAsync(true);
+            _mockUow.Setup(u => u.Genres).Returns(mockGenresRepo.Object);
 
-            // assert
-            // Проверяем статус 201 Created
+            var mockGamesRepo = new Mock<IRepository<Game>>();
+            mockGamesRepo.Setup(r => r.AddAsync(It.IsAny<Game>())).Returns(Task.CompletedTask);
+            _mockUow.Setup(u => u.Games).Returns(mockGamesRepo.Object);
+            
+            _mockUow.Setup(u => u.SaveAsync()).ReturnsAsync(1);
+
+            // ✅ 4. Выполняем тест
+            var result = await _controller.PostGame(newGame);
+
+            // ✅ 5. Проверяем результат
             var createdAtResult = Assert.IsType<CreatedAtActionResult>(result.Result);
+            var returnedDto = Assert.IsType<GameDto>(createdAtResult.Value);
             
-            // Проверяем, что в ответе вернулась созданная игра
-            var returnedGame = Assert.IsType<Game>(createdAtResult.Value);
-            Assert.Equal("New Game", returnedGame.GameTitle);
+            Assert.Equal("New Game", returnedDto.GameTitle);
             
-            // Проверяем, что игра сохранилась в БД
-            Assert.True(await context.Games.AnyAsync(g => g.GameTitle == "New Game"));
+            // ✅ 6. Проверяем, что моки были вызваны
+            mockGenresRepo.Verify(r => r.ExistsAsync(1), Times.Once);
+            mockGamesRepo.Verify(r => r.AddAsync(It.IsAny<Game>()), Times.Once);
+            _mockUow.Verify(u => u.SaveAsync(), Times.Once);
         }
 
-        // Тест: GET по несуществующему ID возвращает 404
         [Fact]
         public async Task GetGame_ReturnsNotFound_WhenGameDoesNotExist()
         {
-            // arrange
-            var context = GetInMemoryContext();
-            var controller = new GamesController(context);
+            var mockGamesRepo = new Mock<IRepository<Game>>();
+            mockGamesRepo.Setup(r => r.GetByIdAsync(999)).ReturnsAsync((Game?)null);
+            _mockUow.Setup(u => u.Games).Returns(mockGamesRepo.Object);
 
-            // act
-            var result = await controller.GetGame(999);
+            var result = await _controller.GetGame(999);
 
-            // assert
-            // Проверяем статус 404 Not Found
-            Assert.IsType<NotFoundResult>(result.Result);
+            Assert.IsType<NotFoundObjectResult>(result.Result);
         }
     }
 }

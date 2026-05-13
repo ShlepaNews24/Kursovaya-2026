@@ -5,6 +5,7 @@ using System.Text;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.Extensions.Logging; // ✅ Для ILogger
 using GamesPlatform.API.Data;
 using GamesPlatform.API.Models;
 
@@ -21,21 +22,31 @@ namespace GamesPlatform.API.Features.Auth
         private readonly AppDbContext _context;
         private readonly IConfiguration _config;
         private readonly IPasswordHasher<User> _passwordHasher;
+        private readonly ILogger<AuthService> _logger; // ✅ Добавлено логирование
 
-        public AuthService(AppDbContext context, IConfiguration config)
+        public AuthService(AppDbContext context, IConfiguration config, ILogger<AuthService> logger)
         {
             _context = context;
             _config = config;
             _passwordHasher = new PasswordHasher<User>();
+            _logger = logger;
         }
 
         public async Task<AuthResponseDto> RegisterAsync(RegisterDto dto)
         {
+            _logger.LogInformation("📝 Registration attempt for email: {Email}", dto.Email);
+
             if (await _context.Users.AnyAsync(u => u.Email == dto.Email))
+            {
+                _logger.LogWarning("⚠️ Registration failed: email already exists {Email}", dto.Email);
                 throw new Exception("Пользователь с таким email уже существует");
+            }
             
             if (await _context.Users.AnyAsync(u => u.UserName == dto.UserName))
+            {
+                _logger.LogWarning("⚠️ Registration failed: username already exists {UserName}", dto.UserName);
                 throw new Exception("Пользователь с таким именем уже существует");
+            }
 
             var userType = (await _context.Users.CountAsync() == 0) ? "Admin" : "User";
 
@@ -55,22 +66,32 @@ namespace GamesPlatform.API.Features.Auth
             _context.Users.Add(user);
             await _context.SaveChangesAsync();
 
+            _logger.LogInformation("✅ User registered: {Email} as {Role}", dto.Email, userType);
             return GenerateToken(user);
         }
 
         public async Task<AuthResponseDto> LoginAsync(LoginDto dto)
         {
+            _logger.LogInformation("🔐 Login attempt for email: {Email}", dto.Email);
+
             var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == dto.Email);
             if (user == null || !user.IsActive)
+            {
+                _logger.LogWarning("⚠️ Login failed: user not found or inactive {Email}", dto.Email);
                 throw new Exception("Неверный email или пароль");
+            }
 
             var result = _passwordHasher.VerifyHashedPassword(user, user.PasswordHash, dto.Password);
             if (result == PasswordVerificationResult.Failed)
+            {
+                _logger.LogWarning("⚠️ Login failed: invalid password for {Email}", dto.Email);
                 throw new Exception("Неверный email или пароль");
+            }
 
             user.LastLoginDate = DateTime.UtcNow;
             await _context.SaveChangesAsync();
 
+            _logger.LogInformation("✅ Login successful: {Email}", dto.Email);
             return GenerateToken(user);
         }
 

@@ -1,31 +1,23 @@
-using GamesPlatform.API.Data;
 using GamesPlatform.API.Interfaces;
-using GamesPlatform.API.Models; 
+using GamesPlatform.API.Models;
+using GamesPlatform.API.Repositories;
 
-namespace GamesPlatform.API.Repositories
+namespace GamesPlatform.API.Data
 {
     public class UnitOfWork : IUnitOfWork
     {
         private readonly AppDbContext _context;
+        private IRepository<Game>? _games;
+        private IRepository<Genre>? _genres;
+        private IRepository<User>? _users;
 
-        public IRepository<User> Users { get; private set; }
-        public IRepository<Game> Games { get; private set; }  
-        public IRepository<Comment> Comments { get; private set; }
-        public IRepository<Genre> Genres { get; private set; }
-        public IRepository<Rating> Ratings { get; private set; }
+        public UnitOfWork(AppDbContext context) => _context = context;
 
-        public UnitOfWork(AppDbContext context)
-        {
-            _context = context;
-            Users = new Repository<User>(context);
-            Games = new Repository<Game>(context); 
-            Comments = new Repository<Comment>(context);
-            Genres = new Repository<Genre>(context);
-            Ratings = new Repository<Rating>(context);
-        }
+        public IRepository<Game> Games => _games ??= new Repository<Game>(_context);
+        public IRepository<Genre> Genres => _genres ??= new Repository<Genre>(_context);
+        public IRepository<User> Users => _users ??= new Repository<User>(_context);
 
         public async Task<int> SaveAsync() => await _context.SaveChangesAsync();
-        
         public void Dispose() => _context.Dispose();
     }
 }
