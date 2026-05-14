@@ -1,11 +1,9 @@
-// [НАЗНАЧЕНИЕ] Контроллер для работы с оценками игр
-// [ФАЙЛ] Controllers/RatingsController.cs
-
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
-using GamesPlatform.API.Data;
+using Microsoft.Extensions.Caching.Memory;
+using System.Text.Json.Serialization;
+using GamesPlatform.API.Interfaces;
 using GamesPlatform.API.Models;
 
 namespace GamesPlatform.API.Controllers
@@ -14,58 +12,50 @@ namespace GamesPlatform.API.Controllers
     [ApiController]
     public class RatingsController : ControllerBase
     {
-        private readonly AppDbContext _context;
+        private readonly IUnitOfWork _uow;
+        private readonly IMemoryCache _cache;
 
-        public RatingsController(AppDbContext context)
+        public RatingsController(IUnitOfWork uow, IMemoryCache cache)
         {
-            _context = context;
+            _uow = uow;
+            _cache = cache;
         }
 
-        // ====================================================================
-        // [НАЗНАЧЕНИЕ] Получение сводки рейтинга для игры
-        // [МАРШРУТ] GET /api/ratings/game/{gameId}
-        // [ВОЗВРАЩАЕТ] Средний рейтинг, количество голосов и оценку текущего пользователя
-        // ====================================================================
         [HttpGet("game/{gameId}")]
         public async Task<ActionResult<RatingSummaryDto>> GetGameRating(int gameId)
         {
-            var gameExists = await _context.Games.AnyAsync(g => g.GameId == gameId);
-            if (!gameExists) return NotFound("Игра не найдена");
-
-            // Подсчёт среднего и количества
-            var ratings = await _context.Ratings
-                .Where(r => r.GameId == gameId)
-                .ToListAsync();
-
-            double average = ratings.Any() ? ratings.Average(r => r.RatingValue) : 0;
-            int count = ratings.Count;
-
-            // Оценка текущего пользователя (если авторизован)
-            int? userRating = null;
-            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
-            if (userIdClaim != null && int.TryParse(userIdClaim.Value, out var userId))
+            var cacheKey = $"rating_{gameId}";
+            if (!_cache.TryGetValue(cacheKey, out RatingSummaryDto? summary))
             {
-                userRating = ratings.FirstOrDefault(r => r.UserId == userId)?.RatingValue;
+                var gameExists = await _uow.Games.ExistsAsync(gameId);
+                if (!gameExists) return NotFound("Игра не найдена");
+
+                var ratings = (await _uow.Ratings.FindAsync(r => r.GameId == gameId)).ToList();
+                double average = ratings.Any() ? ratings.Average(r => r.RatingValue) : 0;
+                int count = ratings.Count;
+
+                int? userRating = null;
+                var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+                if (userIdClaim != null && int.TryParse(userIdClaim.Value, out var userId))
+                {
+                    userRating = ratings.FirstOrDefault(r => r.UserId == userId)?.RatingValue;
+                }
+
+                summary = new RatingSummaryDto
+                {
+                    GameId = gameId,
+                    AverageRating = Math.Round(average, 1),
+                    TotalVotes = count,
+                    UserRating = userRating
+                };
+                _cache.Set(cacheKey, summary, TimeSpan.FromMinutes(1));
             }
-
-            return new RatingSummaryDto
-            {
-                GameId = gameId,
-                AverageRating = Math.Round(average, 1),
-                TotalVotes = count,
-                UserRating = userRating
-            };
+            return Ok(summary);
         }
 
-        // ====================================================================
-        // [НАЗНАЧЕНИЕ] Добавление или обновление оценки
-        // [МАРШРУТ] POST /api/ratings
-        // [ДОСТУП] Только авторизованные пользователи
-        // [ОСОБЕННОСТЬ] Если оценка уже есть — обновляет её
-        // ====================================================================
         [HttpPost]
         [Authorize]
-        public async Task<ActionResult<RatingSummaryDto>> PostRating(RatingDto dto)
+        public async Task<ActionResult<RatingSummaryDto>> PostRating([FromBody] RatingDto dto)
         {
             if (dto.RatingValue < 1 || dto.RatingValue > 5)
                 return BadRequest("Оценка должна быть от 1 до 5");
@@ -74,22 +64,19 @@ namespace GamesPlatform.API.Controllers
             if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out var userId))
                 return Unauthorized("Не удалось определить пользователя");
 
-            var gameExists = await _context.Games.AnyAsync(g => g.GameId == dto.GameId);
+            var gameExists = await _uow.Games.ExistsAsync(dto.GameId);
             if (!gameExists) return BadRequest("Игра не найдена");
 
-            // Проверка существующей оценки
-            var existing = await _context.Ratings
-                .FirstOrDefaultAsync(r => r.GameId == dto.GameId && r.UserId == userId);
+            var existing = (await _uow.Ratings.FindAsync(r => r.GameId == dto.GameId && r.UserId == userId)).FirstOrDefault();
 
             if (existing != null)
             {
-                // Обновляем оценку
                 existing.RatingValue = dto.RatingValue;
+                await _uow.Ratings.UpdateAsync(existing);
             }
             else
             {
-                // Создаём новую
-                _context.Ratings.Add(new Rating
+                await _uow.Ratings.AddAsync(new Rating
                 {
                     GameId = dto.GameId,
                     UserId = userId,
@@ -97,10 +84,11 @@ namespace GamesPlatform.API.Controllers
                 });
             }
 
-            await _context.SaveChangesAsync();
+            await _uow.SaveAsync();
 
-            // Возвращаем обновлённую сводку
-            var ratings = await _context.Ratings.Where(r => r.GameId == dto.GameId).ToListAsync();
+            _cache.Remove($"rating_{dto.GameId}");
+
+            var ratings = (await _uow.Ratings.FindAsync(r => r.GameId == dto.GameId)).ToList();
             double average = ratings.Any() ? ratings.Average(r => r.RatingValue) : 0;
 
             return Ok(new RatingSummaryDto
@@ -113,9 +101,6 @@ namespace GamesPlatform.API.Controllers
         }
     }
 
-    // ========================================================================
-    // [НАЗНАЧЕНИЕ] DTO для передачи сводки рейтинга
-    // ========================================================================
     public class RatingSummaryDto
     {
         public int GameId { get; set; }
@@ -124,12 +109,12 @@ namespace GamesPlatform.API.Controllers
         public int? UserRating { get; set; }
     }
 
-    // ========================================================================
-    // [НАЗНАЧЕНИЕ] DTO для отправки оценки
-    // ========================================================================
     public class RatingDto
     {
+        [JsonPropertyName("gameId")]
         public int GameId { get; set; }
+
+        [JsonPropertyName("ratingValue")]
         public int RatingValue { get; set; }
     }
 }

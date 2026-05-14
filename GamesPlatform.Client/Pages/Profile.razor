@@ -1,73 +1,89 @@
 @page "/profile"
+@using GamesPlatform.Client.Models
 @inject IAuthService AuthService
 @inject NavigationManager Nav
 @inject INotificationService Notify
 
-<PageTitle><span>Profile</span></PageTitle>
+<PageTitle>Profile</PageTitle>
 
 @if (!isLoaded)
 {
     <div class="text-center py-5">
-        <div class="spinner-border text-primary" role="status"></div>
-        <p class="mt-2"><span>Loading...</span></p>
+        <div class="spinner-border text-primary"></div>
+        <p class="mt-2">Loading...</p>
     </div>
 }
 else if (!isAuthenticated)
 {
     <div class="alert alert-warning">
-        <span>⚠️ <a href="/login"><span>Login</span></a> to view profile.</span>
+        ⚠️ <a href="/login">Login</a> to view profile.
     </div>
 }
 else
 {
-    <h3><span>My Profile</span></h3>
-    
+    <h3>My Profile</h3>
+
     <div class="card mb-4" style="max-width: 600px;">
         <div class="card-body">
-            <p><span><strong>Username:</strong> @userName</span></p>
-            <p><span><strong>Email:</strong> @userEmail</span></p>
-            <p><span><strong>Role:</strong> @userRole</span></p>
-            
-            <p><span><strong>Registration Date:</strong> @(registrationDate?.ToString("dd.MM.yyyy HH:mm") ?? "N/A")</span></p>
-            <p><span><strong>Last Login:</strong> @(lastLoginDate?.ToString("dd.MM.yyyy HH:mm") ?? "N/A")</span></p>
-            <p><span><strong>Date of Birth:</strong> @(dateOfBirth?.ToString("dd.MM.yyyy") ?? "Not set")</span></p>
-            
-            <button class="btn btn-danger" @onclick="HandleLogout"><span>Logout</span></button>
+            <p><strong>Username:</strong> @userName</p>
+            <p><strong>Email:</strong> @userEmail</p>
+            <p><strong>Role:</strong> @userRole</p>
+            <p><strong>Registration Date:</strong> @(registrationDate?.ToString("dd.MM.yyyy HH:mm") ?? "N/A")</p>
+            <p><strong>Last Login:</strong> @(lastLoginDate?.ToString("dd.MM.yyyy HH:mm") ?? "N/A")</p>
+            <p><strong>Date of Birth:</strong> @(dateOfBirth?.ToString("dd.MM.yyyy") ?? "Not set")</p>
+            <button class="btn btn-danger" @onclick="HandleLogout">Logout</button>
         </div>
     </div>
-    
+
     <div class="row">
         <div class="col-md-6">
             <div class="card mb-4">
-                <div class="card-header"><h5><span>Change Nickname</span></h5></div>
+                <div class="card-header"><h5>Change Nickname</h5></div>
                 <div class="card-body">
-                    <form @onsubmit="HandleUpdateUsername">
+                    <EditForm Model="@usernameModel" OnValidSubmit="@HandleUpdateUsername">
+                        <DataAnnotationsValidator />
+                        <ValidationSummary class="alert alert-danger" />
                         <div class="mb-3">
-                            <label class="form-label"><span>New Username</span></label>
-                            <input type="text" class="form-control" @bind="newUserName" required minlength="3" maxlength="50" />
+                            <label class="form-label">New Username</label>
+                            <InputText class="form-control" @bind-Value="usernameModel.NewUserName" />
+                            <ValidationMessage For="@(() => usernameModel.NewUserName)" />
                         </div>
-                        <button type="submit" class="btn btn-primary" disabled="@(isUpdatingName || string.IsNullOrWhiteSpace(newUserName))">
-                            @if (isUpdatingName) { <span class="spinner-border spinner-border-sm"></span> <span>Updating...</span> }
-                            else { <span>Update Nickname</span> }
+                        <button type="submit" class="btn btn-primary" disabled="@isUpdatingName">
+                            @if (isUpdatingName)
+                            {
+                                <span class="spinner-border spinner-border-sm"></span>
+                                <span>Updating...</span>
+                            }
+                            else
+                            {
+                                <span>Update Nickname</span>
+                            }
                         </button>
-                    </form>
+                    </EditForm>
                 </div>
             </div>
         </div>
-        
+
         <div class="col-md-6">
             <div class="card mb-4">
-                <div class="card-header"><h5><span>Update Date of Birth</span></h5></div>
+                <div class="card-header"><h5>Update Date of Birth</h5></div>
                 <div class="card-body">
                     <form @onsubmit="HandleUpdateDateOfBirth">
                         <div class="mb-3">
-                            <label class="form-label"><span>Date of Birth</span></label>
+                            <label class="form-label">Date of Birth</label>
                             <input type="date" class="form-control" @bind="newDateOfBirth" />
-                            <small class="text-muted"><span>Leave empty to clear</span></small>
+                            <small class="text-muted">Leave empty to clear</small>
                         </div>
                         <button type="submit" class="btn btn-primary" disabled="@isUpdatingDob">
-                            @if (isUpdatingDob) { <span class="spinner-border spinner-border-sm"></span> <span>Saving...</span> }
-                            else { <span>Save Date</span> }
+                            @if (isUpdatingDob)
+                            {
+                                <span class="spinner-border spinner-border-sm"></span>
+                                <span>Saving...</span>
+                            }
+                            else
+                            {
+                                <span>Save Date</span>
+                            }
                         </button>
                     </form>
                 </div>
@@ -81,21 +97,21 @@ else
     private bool isAuthenticated = false;
     private bool isUpdatingName = false;
     private bool isUpdatingDob = false;
-    
+
     private string userName = "";
     private string userEmail = "";
     private string userRole = "";
     private DateTime? registrationDate;
     private DateTime? lastLoginDate;
     private DateTime? dateOfBirth;
-    
-    private string newUserName = "";
     private DateTime? newDateOfBirth;
+
+    private UpdateUsernameViewModel usernameModel = new();
 
     protected override async Task OnInitializedAsync()
     {
         isAuthenticated = await AuthService.IsAuthenticatedAsync();
-        
+
         if (isAuthenticated)
         {
             userName = await AuthService.GetUserNameAsync() ?? "Unknown";
@@ -104,37 +120,36 @@ else
             registrationDate = await AuthService.GetRegistrationDateAsync();
             lastLoginDate = await AuthService.GetLastLoginDateAsync();
             dateOfBirth = await AuthService.GetDateOfBirthAsync();
-            
-            newUserName = userName;
+
+            usernameModel.NewUserName = userName;
             newDateOfBirth = dateOfBirth;
         }
-        
+
         isLoaded = true;
     }
 
     private async Task HandleUpdateUsername()
     {
-        if (string.IsNullOrWhiteSpace(newUserName) || newUserName.Length < 3)
-        {
-            Notify.Show("Username must be at least 3 characters", "error");
-            return;
-        }
-        
-        if (newUserName.Trim() == userName)
+        if (usernameModel.NewUserName.Trim() == userName)
         {
             Notify.Show("New username is the same as current", "info");
             return;
         }
-        
+
         isUpdatingName = true;
         StateHasChanged();
-        
+
         try
         {
-            var success = await AuthService.UpdateUserNameAsync(newUserName.Trim());
+            var success = await AuthService.UpdateUserNameAsync(usernameModel.NewUserName.Trim());
             if (success)
             {
-                userName = newUserName.Trim();
+                userName = usernameModel.NewUserName.Trim();
+                Notify.Show("Username updated successfully", "success");
+            }
+            else
+            {
+                Notify.Show("Failed to update username", "error");
             }
         }
         finally
@@ -151,16 +166,21 @@ else
             Notify.Show("Date of birth cannot be in the future", "error");
             return;
         }
-        
+
         isUpdatingDob = true;
         StateHasChanged();
-        
+
         try
         {
             var success = await AuthService.UpdateDateOfBirthAsync(newDateOfBirth);
             if (success)
             {
                 dateOfBirth = newDateOfBirth;
+                Notify.Show("Date of birth updated successfully", "success");
+            }
+            else
+            {
+                Notify.Show("Failed to update date of birth", "error");
             }
         }
         finally

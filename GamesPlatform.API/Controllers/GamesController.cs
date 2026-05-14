@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using System.Security.Claims;
-using Microsoft.Extensions.Caching.Memory;
 using GamesPlatform.API.Interfaces;
 using GamesPlatform.API.Models;
 
@@ -13,41 +12,29 @@ namespace GamesPlatform.API.Controllers
     {
         private readonly IUnitOfWork _uow;
         private readonly ILogger<GamesController> _logger;
-        private readonly IMemoryCache _cache;
-        private const string GamesCachePrefix = "games_paged_";
 
-        public GamesController(IUnitOfWork uow, ILogger<GamesController> logger, IMemoryCache cache)
+        public GamesController(IUnitOfWork uow, ILogger<GamesController> logger)
         {
             _uow = uow;
             _logger = logger;
-            _cache = cache;
         }
 
         [HttpGet]
         public async Task<ActionResult<PagedResult<GameDto>>> GetGames([FromQuery] GamesQueryDto query)
         {
-            var cacheKey = $"{GamesCachePrefix}{query.PageNumber}_{query.PageSize}_{query.Search}_{query.GenreId}";
+            _logger.LogInformation("GET /api/games (Page={Page}, Search={Search}, GenreId={GenreId})",
+                query.PageNumber, query.Search ?? "null", query.GenreId);
 
-            if (!_cache.TryGetValue(cacheKey, out PagedResult<GameDto>? result))
+            var (items, totalCount) = await _uow.GetPagedGamesAsync(
+                query.PageNumber, query.PageSize, query.Search, query.GenreId);
+
+            var result = new PagedResult<GameDto>
             {
-                var (items, totalCount) = await _uow.GetPagedGamesAsync(
-                    query.PageNumber, query.PageSize, query.Search, query.GenreId);
-
-                result = new PagedResult<GameDto>
-                {
-                    Items = items,
-                    TotalCount = totalCount,
-                    PageNumber = query.PageNumber,
-                    PageSize = query.PageSize
-                };
-
-                _cache.Set(cacheKey, result, TimeSpan.FromMinutes(5));
-                _logger.LogDebug("Cache MISS for {CacheKey}", cacheKey);
-            }
-            else
-            {
-                _logger.LogDebug("Cache HIT for {CacheKey}", cacheKey);
-            }
+                Items = items,
+                TotalCount = totalCount,
+                PageNumber = query.PageNumber,
+                PageSize = query.PageSize
+            };
 
             return Ok(result);
         }
@@ -64,6 +51,8 @@ namespace GamesPlatform.API.Controllers
         [Authorize]
         public async Task<ActionResult<GameDto>> PostGame(CreateGameDto dto)
         {
+            _logger.LogInformation("Create game request: {Title}", dto.GameTitle);
+
             if (string.IsNullOrWhiteSpace(dto.GameTitle))
                 return BadRequest("Название игры обязательно");
             if (string.IsNullOrWhiteSpace(dto.GameUrl) || !Uri.IsWellFormedUriString(dto.GameUrl, UriKind.Absolute))
@@ -91,7 +80,7 @@ namespace GamesPlatform.API.Controllers
             await _uow.Games.AddAsync(game);
             await _uow.SaveAsync();
 
-            _cache.Remove(GamesCachePrefix);
+            _logger.LogInformation("Game created: {Title}", game.GameTitle);
             return CreatedAtAction(nameof(GetGame), new { id = game.GameId }, MapToDto(game));
         }
 
@@ -121,7 +110,6 @@ namespace GamesPlatform.API.Controllers
             await _uow.Games.UpdateAsync(existing);
             await _uow.SaveAsync();
 
-            _cache.Remove(GamesCachePrefix);
             return NoContent();
         }
 
@@ -141,7 +129,6 @@ namespace GamesPlatform.API.Controllers
             await _uow.Games.DeleteAsync(game);
             await _uow.SaveAsync();
 
-            _cache.Remove(GamesCachePrefix);
             return NoContent();
         }
 

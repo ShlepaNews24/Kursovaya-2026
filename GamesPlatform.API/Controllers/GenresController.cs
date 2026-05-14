@@ -1,6 +1,7 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using GamesPlatform.API.Data;
+using Microsoft.Extensions.Caching.Memory;
+using GamesPlatform.API.Interfaces;
 using GamesPlatform.API.Models;
 
 namespace GamesPlatform.API.Controllers
@@ -9,93 +10,73 @@ namespace GamesPlatform.API.Controllers
     [ApiController]
     public class GenresController : ControllerBase
     {
-        private readonly AppDbContext _context;
+        private readonly IUnitOfWork _uow;
+        private readonly IMemoryCache _cache;
+        private const string GenresCacheKey = "all_genres";
 
-        public GenresController(AppDbContext context)
+        public GenresController(IUnitOfWork uow, IMemoryCache cache)
         {
-            _context = context;
+            _uow = uow;
+            _cache = cache;
         }
 
-        // GET: api/genres
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<Genre>>> GetGenres()
+        public async Task<ActionResult<IEnumerable<GenreDto>>> GetGenres()
         {
-            return await _context.Genres.ToListAsync();
-        }
-
-        // GET: api/genres/5
-        [HttpGet("{id}")]
-        public async Task<ActionResult<Genre>> GetGenre(int id)
-        {
-            var genre = await _context.Genres.FindAsync(id);
-
-            if (genre == null)
+            if (!_cache.TryGetValue(GenresCacheKey, out List<GenreDto>? genres))
             {
-                return NotFound();
+                var genreEntities = await _uow.Genres.GetAllAsync();
+                genres = genreEntities.Select(g => new GenreDto { GenreId = g.GenreId, GenreName = g.GenreName }).ToList();
+                _cache.Set(GenresCacheKey, genres, TimeSpan.FromHours(1));
             }
-
-            return genre;
+            return Ok(genres);
         }
 
-        // PUT: api/genres/5
+        [HttpGet("{id}")]
+        public async Task<ActionResult<GenreDto>> GetGenre(int id)
+        {
+            var genre = await _uow.Genres.GetByIdAsync(id);
+            if (genre == null) return NotFound();
+            return Ok(new GenreDto { GenreId = genre.GenreId, GenreName = genre.GenreName });
+        }
+
+        [Authorize(Roles = "Admin")]
+        [HttpPost]
+        public async Task<ActionResult<GenreDto>> PostGenre(Genre genre)
+        {
+            await _uow.Genres.AddAsync(genre);
+            await _uow.SaveAsync();
+            _cache.Remove(GenresCacheKey);
+            return CreatedAtAction(nameof(GetGenre), new { id = genre.GenreId }, new GenreDto { GenreId = genre.GenreId, GenreName = genre.GenreName });
+        }
+
+        [Authorize(Roles = "Admin")]
         [HttpPut("{id}")]
         public async Task<IActionResult> PutGenre(int id, Genre genre)
         {
-            if (id != genre.GenreId)
-            {
-                return BadRequest();
-            }
-
-            _context.Entry(genre).State = EntityState.Modified;
-
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!GenreExists(id))
-                {
-                    return NotFound();
-                }
-                else
-                {
-                    throw;
-                }
-            }
-
+            if (id != genre.GenreId) return BadRequest();
+            await _uow.Genres.UpdateAsync(genre);
+            await _uow.SaveAsync();
+            _cache.Remove(GenresCacheKey);
             return NoContent();
         }
 
-        // POST: api/genres
-        [HttpPost]
-        public async Task<ActionResult<Genre>> PostGenre(Genre genre)
-        {
-            _context.Genres.Add(genre);
-            await _context.SaveChangesAsync();
-
-            return CreatedAtAction(nameof(GetGenre), new { id = genre.GenreId }, genre);
-        }
-
-        // DELETE: api/genres/5
+        [Authorize(Roles = "Admin")]
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteGenre(int id)
         {
-            var genre = await _context.Genres.FindAsync(id);
-            if (genre == null)
-            {
-                return NotFound();
-            }
-
-            _context.Genres.Remove(genre);
-            await _context.SaveChangesAsync();
-
+            var genre = await _uow.Genres.GetByIdAsync(id);
+            if (genre == null) return NotFound();
+            await _uow.Genres.DeleteAsync(genre);
+            await _uow.SaveAsync();
+            _cache.Remove(GenresCacheKey);
             return NoContent();
         }
+    }
 
-        private bool GenreExists(int id)
-        {
-            return _context.Genres.Any(e => e.GenreId == id);
-        }
+    public class GenreDto
+    {
+        public int GenreId { get; set; }
+        public string GenreName { get; set; } = string.Empty;
     }
 }

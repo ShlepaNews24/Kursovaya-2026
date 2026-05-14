@@ -1,39 +1,43 @@
-@* [НАЗНАЧЕНИЕ] Страница создания новой игры *@
-@* [ФАЙЛ] Pages/CreateGame.razor *@
 @page "/games/create"
+@using GamesPlatform.Client.Models
 @inject IGamesService GamesService
 @inject IAuthService AuthService
 @inject INotificationService Notify
 @inject NavigationManager Nav
 
-<PageTitle><span>Create Game</span></PageTitle>
+<PageTitle>Create Game</PageTitle>
 
 @if (!isAuthenticated)
 {
     <div class="alert alert-warning">
-        <span>⚠️ <a href="/login"><span>Login</span></a> to create a game.</span>
+        ⚠️ <a href="/login">Login</a> to create a game.
     </div>
 }
 else
 {
-    <h3><span>Create New Game</span></h3>
-    
+    <h3>Create New Game</h3>
+
     <div class="card" style="max-width: 700px;">
         <div class="card-body">
-            <form @onsubmit="HandleCreateGame">
+            <EditForm Model="@model" OnValidSubmit="@HandleCreateGame">
+                <DataAnnotationsValidator />
+                <ValidationSummary class="alert alert-danger" />
+
                 <div class="mb-3">
-                    <label class="form-label"><span>Game Title *</span></label>
-                    <input type="text" class="form-control" @bind="newGame.GameTitle" required maxlength="100" />
+                    <label class="form-label">Game Title *</label>
+                    <InputText class="form-control" @bind-Value="model.GameTitle" />
+                    <ValidationMessage For="@(() => model.GameTitle)" />
                 </div>
-                
+
                 <div class="mb-3">
-                    <label class="form-label"><span>Description</span></label>
-                    <textarea class="form-control" @bind="newGame.Description" rows="3" maxlength="500"></textarea>
+                    <label class="form-label">Description</label>
+                    <InputTextArea class="form-control" @bind-Value="model.Description" rows="3" />
+                    <ValidationMessage For="@(() => model.Description)" />
                 </div>
-                
+
                 <div class="mb-3">
-                    <label class="form-label"><span>Genre *</span></label>
-                    <select class="form-select" @bind="newGame.GenreId" required>
+                    <label class="form-label">Genre *</label>
+                    <InputSelect class="form-select" @bind-Value="model.GenreId">
                         <option value="">-- Select Genre --</option>
                         @if (genres?.Any() == true)
                         {
@@ -42,51 +46,46 @@ else
                                 <option value="@genre.GenreId">@genre.GenreName</option>
                             }
                         }
+                    </InputSelect>
+                    <ValidationMessage For="@(() => model.GenreId)" />
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Game URL (iframe) *</label>
+                    <InputText class="form-control" @bind-Value="model.GameUrl" placeholder="https://..." />
+                    <ValidationMessage For="@(() => model.GameUrl)" />
+                    <small class="text-muted">Direct link to the HTML5 game</small>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Logo URL</label>
+                    <InputText class="form-control" @bind-Value="model.Logo" placeholder="https://..." />
+                    <ValidationMessage For="@(() => model.Logo)" />
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Release Date</label>
+                    <InputDate class="form-control" @bind-Value="model.ReleaseDate" />
+                    <ValidationMessage For="@(() => model.ReleaseDate)" />
+                </div>
+
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary" disabled="@isSubmitting">
+                        @if (isSubmitting)
+                        {
+                            <span class="spinner-border spinner-border-sm"></span>
+                            <span>Creating...</span>
+                        }
                         else
                         {
-                            <option disabled><span>No genres available</span></option>
-                        }
-                    </select>
-                </div>
-                
-                <div class="mb-3">
-                    <label class="form-label"><span>Game URL (iframe) *</span></label>
-                    <input type="url" class="form-control" @bind="newGame.GameUrl" required placeholder="https://..." />
-                    <small class="text-muted"><span>Direct link to the HTML5 game</span></small>
-                </div>
-                
-                <div class="mb-3">
-                    <label class="form-label"><span>Logo URL</span></label>
-                    <input type="url" class="form-control" @bind="newGame.Logo" placeholder="https://..." />
-                </div>
-                
-                <div class="mb-3">
-                    <label class="form-label"><span>Release Date</span></label>
-                    <input type="date" class="form-control" @bind="newGame.ReleaseDate" />
-                </div>
-                
-                <div class="d-flex gap-2">
-                    <button type="submit" class="btn btn-primary" disabled="@(isSubmitting)">
-                        @if (isSubmitting) 
-                        { 
-                            <span class="spinner-border spinner-border-sm"></span> 
-                            <span>Creating...</span> 
-                        }
-                        else 
-                        { 
-                            <span>Create Game</span> 
+                            <span>Create Game</span>
                         }
                     </button>
-                    
-                    @* ✅ ИСПРАВЛЕНО: 
-                         1. Атрибут @onclick в одинарных кавычках '...'
-                         2. Строка пути "/games" в двойных кавычках "..."
-                    *@
                     <button type="button" class="btn btn-secondary" @onclick='() => Nav.NavigateTo("/games")'>
-                        <span>Cancel</span>
+                        Cancel
                     </button>
                 </div>
-            </form>
+            </EditForm>
         </div>
     </div>
 }
@@ -95,12 +94,7 @@ else
     private bool isAuthenticated = false;
     private bool isSubmitting = false;
     private List<GenreDto>? genres;
-    
-    private GameDto newGame = new()
-    {
-        ReleaseDate = DateTime.UtcNow,
-        ModifiedDate = DateTime.UtcNow
-    };
+    private CreateGameViewModel model = new();
 
     protected override async Task OnInitializedAsync()
     {
@@ -113,30 +107,22 @@ else
 
     private async Task HandleCreateGame()
     {
-        if (string.IsNullOrWhiteSpace(newGame.GameTitle) || 
-            string.IsNullOrWhiteSpace(newGame.GameUrl) || 
-            newGame.GenreId == 0)
-        {
-            Notify.Show("Please fill in all required fields", "error");
-            return;
-        }
-        
-        if (!Uri.IsWellFormedUriString(newGame.GameUrl, UriKind.Absolute))
-        {
-            Notify.Show("Invalid game URL format", "error");
-            return;
-        }
-        
         isSubmitting = true;
         StateHasChanged();
-        
+
         try
         {
-            var success = await GamesService.AddGameAsync(newGame);
-            if (success)
+            var gameDto = new GameDto
             {
-                Nav.NavigateTo("/games");
-            }
+                GameTitle = model.GameTitle,
+                Description = model.Description,
+                ReleaseDate = model.ReleaseDate,
+                GameUrl = model.GameUrl,
+                Logo = model.Logo,
+                GenreId = model.GenreId
+            };
+            var success = await GamesService.AddGameAsync(gameDto);
+            if (success) Nav.NavigateTo("/games");
         }
         finally
         {
