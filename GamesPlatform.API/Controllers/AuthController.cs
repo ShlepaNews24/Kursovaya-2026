@@ -1,18 +1,30 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 using GamesPlatform.API.Features.Auth;
 
 namespace GamesPlatform.API.Controllers
 {
-    [Route("api/[controller]")]
     [ApiController]
+    [Route("api/auth")]
     public class AuthController : ControllerBase
     {
         private readonly IAuthService _authService;
 
-        // Внедрение сервиса авторизации
-        public AuthController(IAuthService authService)
+        public AuthController(IAuthService authService) => _authService = authService;
+
+        [HttpPost("login")]
+        public async Task<IActionResult> Login([FromBody] LoginDto dto)
         {
-            _authService = authService;
+            try
+            {
+                var response = await _authService.LoginAsync(dto.Email, dto.Password);
+                return Ok(response);
+            }
+            catch (Exception ex)
+            {
+                return Unauthorized(new { message = ex.Message });
+            }
         }
 
         [HttpPost("register")]
@@ -21,28 +33,25 @@ namespace GamesPlatform.API.Controllers
             try
             {
                 var result = await _authService.RegisterAsync(dto);
-                return Ok(result);
+                return Ok(new { message = "Registration successful", user = result });
             }
             catch (Exception ex)
             {
-                // При ошибке валидации возвращаем 400 Bad Request
                 return BadRequest(new { message = ex.Message });
             }
         }
 
-        [HttpPost("login")]
-        public async Task<IActionResult> Login([FromBody] LoginDto dto)
+        [HttpGet("info")]
+        [Authorize]
+        public IActionResult GetUserInfo()
         {
-            try
+            return Ok(new
             {
-                var result = await _authService.LoginAsync(dto);
-                return Ok(result);
-            }
-            catch (Exception ex)
-            {
-                // При неверных данных возвращаем 401 Unauthorized
-                return Unauthorized(new { message = ex.Message });
-            }
+                userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value,
+                email = User.FindFirst(ClaimTypes.Email)?.Value,
+                role = User.FindFirst(ClaimTypes.Role)?.Value,
+                userName = User.FindFirst(ClaimTypes.Name)?.Value
+            });
         }
     }
 }

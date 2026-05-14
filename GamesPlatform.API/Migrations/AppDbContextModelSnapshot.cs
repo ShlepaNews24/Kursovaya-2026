@@ -51,6 +51,9 @@ namespace GamesPlatform.API.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
+                    b.Property<string>("Description")
+                        .HasColumnType("TEXT");
+
                     b.Property<int>("DeveloperId")
                         .HasColumnType("INTEGER");
 
@@ -59,7 +62,15 @@ namespace GamesPlatform.API.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("GameUrl")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
                     b.Property<int>("GenreId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("GenreId1")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("Logo")
@@ -76,6 +87,8 @@ namespace GamesPlatform.API.Migrations
                     b.HasIndex("DeveloperId");
 
                     b.HasIndex("GenreId");
+
+                    b.HasIndex("GenreId1");
 
                     b.ToTable("Games");
                 });
@@ -126,13 +139,19 @@ namespace GamesPlatform.API.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
+                    b.Property<DateTime?>("DateOfBirth")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Email")
                         .IsRequired()
-                        .HasMaxLength(255)
+                        .HasMaxLength(100)
                         .HasColumnType("TEXT");
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("INTEGER");
+
+                    b.Property<DateTime?>("LastLoginDate")
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("PasswordHash")
                         .IsRequired()
@@ -143,14 +162,13 @@ namespace GamesPlatform.API.Migrations
 
                     b.Property<string>("UserName")
                         .IsRequired()
-                        .HasMaxLength(100)
+                        .HasMaxLength(50)
                         .HasColumnType("TEXT");
 
                     b.Property<string>("UserType")
                         .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT")
-                        .HasDefaultValue("User");
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
 
                     b.HasKey("UserId");
 
@@ -182,16 +200,20 @@ namespace GamesPlatform.API.Migrations
             modelBuilder.Entity("GamesPlatform.API.Models.Game", b =>
                 {
                     b.HasOne("GamesPlatform.API.Models.User", "Developer")
-                        .WithMany("CreatedGames")
+                        .WithMany("Games")
                         .HasForeignKey("DeveloperId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.HasOne("GamesPlatform.API.Models.Genre", "Genre")
-                        .WithMany("Games")
+                        .WithMany()
                         .HasForeignKey("GenreId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.HasOne("GamesPlatform.API.Models.Genre", null)
+                        .WithMany("Games")
+                        .HasForeignKey("GenreId1");
 
                     b.Navigation("Developer");
 
@@ -233,7 +255,7 @@ namespace GamesPlatform.API.Migrations
                 {
                     b.Navigation("Comments");
 
-                    b.Navigation("CreatedGames");
+                    b.Navigation("Games");
 
                     b.Navigation("Ratings");
                 });

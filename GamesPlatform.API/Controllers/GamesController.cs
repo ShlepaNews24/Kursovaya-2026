@@ -1,11 +1,7 @@
-// Контроллер управления играми
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using System.Security.Claims;
-using Microsoft.Extensions.Logging; // ✅ Для ILogger
+using Microsoft.Extensions.Caching.Memory;
 using GamesPlatform.API.Interfaces;
 using GamesPlatform.API.Models;
 
@@ -16,208 +12,116 @@ namespace GamesPlatform.API.Controllers
     public class GamesController : ControllerBase
     {
         private readonly IUnitOfWork _uow;
-        private readonly ILogger<GamesController> _logger; // ✅ Добавлено логирование
+        private readonly ILogger<GamesController> _logger;
+        private readonly IMemoryCache _cache;
+        private const string GamesCachePrefix = "games_paged_";
 
-        // ✅ Внедряем ILogger в конструктор
-        public GamesController(IUnitOfWork uow, ILogger<GamesController> logger)
+        public GamesController(IUnitOfWork uow, ILogger<GamesController> logger, IMemoryCache cache)
         {
             _uow = uow;
             _logger = logger;
+            _cache = cache;
         }
 
         [HttpGet]
         public async Task<ActionResult<PagedResult<GameDto>>> GetGames([FromQuery] GamesQueryDto query)
         {
-            _logger.LogInformation("📥 Request: GET /api/games (Page={Page}, Search={Search})", 
-                query.PageNumber, query.Search ?? "null");
+            var cacheKey = $"{GamesCachePrefix}{query.PageNumber}_{query.PageSize}_{query.Search}_{query.GenreId}";
 
-            var games = (await _uow.Games.GetAllAsync())
-                .OrderByDescending(g => g.ModifiedDate)
-                .AsQueryable();
-
-            if (!string.IsNullOrWhiteSpace(query.Search))
+            if (!_cache.TryGetValue(cacheKey, out PagedResult<GameDto>? result))
             {
-                _logger.LogDebug("🔍 Filtering by search: {Search}", query.Search);
-                games = games.Where(g => g.GameTitle.Contains(query.Search));
-            }
+                var (items, totalCount) = await _uow.GetPagedGamesAsync(
+                    query.PageNumber, query.PageSize, query.Search, query.GenreId);
 
-            if (query.GenreId.HasValue)
-            {
-                _logger.LogDebug("🔍 Filtering by GenreId: {GenreId}", query.GenreId);
-                games = games.Where(g => g.GenreId == query.GenreId.Value);
-            }
-
-            var totalCount = games.Count();
-
-            var items = games
-                .Skip((query.PageNumber - 1) * query.PageSize)
-                .Take(query.PageSize)
-                .Select(g => new GameDto
+                result = new PagedResult<GameDto>
                 {
-                    GameId = g.GameId,
-                    GameTitle = g.GameTitle,
-                    Description = g.Description,
-                    ReleaseDate = g.ReleaseDate,
-                    ModifiedDate = g.ModifiedDate,
-                    Logo = g.Logo,
-                    GameUrl = g.GameUrl,
-                    GenreId = g.GenreId,
-                    DeveloperId = g.DeveloperId
-                })
-                .ToList();
+                    Items = items,
+                    TotalCount = totalCount,
+                    PageNumber = query.PageNumber,
+                    PageSize = query.PageSize
+                };
 
-            _logger.LogInformation("✅ Returned {Count} games (Total: {Total})", items.Count, totalCount);
-            return Ok(new PagedResult<GameDto>
+                _cache.Set(cacheKey, result, TimeSpan.FromMinutes(5));
+                _logger.LogDebug("Cache MISS for {CacheKey}", cacheKey);
+            }
+            else
             {
-                Items = items,
-                TotalCount = totalCount,
-                PageNumber = query.PageNumber,
-                PageSize = query.PageSize
-            });
+                _logger.LogDebug("Cache HIT for {CacheKey}", cacheKey);
+            }
+
+            return Ok(result);
         }
 
         [HttpGet("{id}")]
         public async Task<ActionResult<GameDto>> GetGame(int id)
         {
-            _logger.LogDebug("🔍 Getting game with ID: {Id}", id);
-
             var game = await _uow.Games.GetByIdAsync(id);
-            if (game == null) 
-            {
-                _logger.LogWarning("⚠️ Game not found: {Id}", id);
-                return NotFound("Игра не найдена");
-            }
-
-            _logger.LogInformation("✅ Game retrieved: {Title}", game.GameTitle);
-            return Ok(new GameDto
-            {
-                GameId = game.GameId,
-                GameTitle = game.GameTitle,
-                Description = game.Description,
-                ReleaseDate = game.ReleaseDate,
-                ModifiedDate = game.ModifiedDate,
-                Logo = game.Logo,
-                GameUrl = game.GameUrl,
-                GenreId = game.GenreId,
-                DeveloperId = game.DeveloperId
-            });
+            if (game == null) return NotFound("Игра не найдена");
+            return Ok(MapToDto(game));
         }
 
         [HttpPost]
         [Authorize]
-        public async Task<ActionResult<GameDto>> PostGame(Game game)
+        public async Task<ActionResult<GameDto>> PostGame(CreateGameDto dto)
         {
-            _logger.LogInformation("🆕 Create request for game: {Title}", game.GameTitle);
-
-            if (string.IsNullOrWhiteSpace(game.GameTitle))
-            {
-                _logger.LogWarning("⚠️ Validation failed: empty title");
+            if (string.IsNullOrWhiteSpace(dto.GameTitle))
                 return BadRequest("Название игры обязательно");
-            }
-            
-            if (string.IsNullOrWhiteSpace(game.GameUrl))
-            {
-                _logger.LogWarning("⚠️ Validation failed: empty URL");
-                return BadRequest("URL игры обязателен");
-            }
-            
-            if (!Uri.IsWellFormedUriString(game.GameUrl, UriKind.Absolute))
-            {
-                _logger.LogWarning("⚠️ Validation failed: invalid URL format");
-                return BadRequest("Некорректный формат URL");
-            }
+            if (string.IsNullOrWhiteSpace(dto.GameUrl) || !Uri.IsWellFormedUriString(dto.GameUrl, UriKind.Absolute))
+                return BadRequest("Некорректный URL");
 
             var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
             if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out var userId))
-            {
-                _logger.LogWarning("⚠️ Authorization failed: cannot determine user");
-                return Unauthorized("Не удалось определить пользователя");
-            }
+                return Unauthorized();
 
-            game.DeveloperId = userId;
-            game.ModifiedDate = DateTime.UtcNow;
+            var game = new Game
+            {
+                GameTitle = dto.GameTitle,
+                Description = dto.Description,
+                ReleaseDate = dto.ReleaseDate,
+                GameUrl = dto.GameUrl,
+                Logo = dto.Logo,
+                GenreId = dto.GenreId,
+                DeveloperId = userId,
+                ModifiedDate = DateTime.UtcNow
+            };
 
             if (!await _uow.Genres.ExistsAsync(game.GenreId))
-            {
-                _logger.LogWarning("⚠️ Genre not found: {GenreId}", game.GenreId);
-                return BadRequest("Указанный жанр не существует");
-            }
+                return BadRequest("Жанр не существует");
 
-            try
-            {
-                await _uow.Games.AddAsync(game);
-                await _uow.SaveAsync();
-                
-                _logger.LogInformation("✅ Game created: {Title} by User {UserId}", 
-                    game.GameTitle, game.DeveloperId);
-                    
-                return CreatedAtAction(nameof(GetGame), new { id = game.GameId }, new GameDto
-                {
-                    GameId = game.GameId,
-                    GameTitle = game.GameTitle,
-                    Description = game.Description,
-                    ReleaseDate = game.ReleaseDate,
-                    ModifiedDate = game.ModifiedDate,
-                    Logo = game.Logo,
-                    GameUrl = game.GameUrl,
-                    GenreId = game.GenreId,
-                    DeveloperId = game.DeveloperId
-                });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "❌ Failed to create game: {Title}", game.GameTitle);
-                return StatusCode(500, "Internal server error");
-            }
+            await _uow.Games.AddAsync(game);
+            await _uow.SaveAsync();
+
+            _cache.Remove(GamesCachePrefix);
+            return CreatedAtAction(nameof(GetGame), new { id = game.GameId }, MapToDto(game));
         }
 
         [HttpPut("{id}")]
         [Authorize]
-        public async Task<IActionResult> PutGame(int id, Game game)
+        public async Task<IActionResult> PutGame(int id, UpdateGameDto dto)
         {
-            _logger.LogInformation("✏️ Update request for game ID: {Id}", id);
-
-            if (id != game.GameId) 
-            {
-                _logger.LogWarning("⚠️ ID mismatch: URL={UrlId}, Body={BodyId}", id, game.GameId);
-                return BadRequest("ID в URL и теле запроса не совпадают");
-            }
-            
-            if (!Uri.IsWellFormedUriString(game.GameUrl, UriKind.Absolute))
-                return BadRequest("Некорректный формат URL");
+            if (id != dto.GameId) return BadRequest("ID не совпадают");
 
             var existing = await _uow.Games.GetByIdAsync(id);
-            if (existing == null) 
-            {
-                _logger.LogWarning("⚠️ Game not found for update: {Id}", id);
-                return NotFound("Игра не найдена");
-            }
+            if (existing == null) return NotFound();
 
-            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
-            var userRole = User.FindFirst(ClaimTypes.Role)?.Value;
-            
-            if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out var userId))
-                return Unauthorized();
+            var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+            var userRole = User.FindFirstValue(ClaimTypes.Role);
 
             if (userRole != "Admin" && existing.DeveloperId != userId)
-            {
-                _logger.LogWarning("⚠️ Forbidden: User {UserId} tried to edit game {GameId} owned by {OwnerId}", 
-                    userId, id, existing.DeveloperId);
-                return StatusCode(403, "Нет прав на редактирование чужой игры");
-            }
+                return StatusCode(403, "Нет прав");
 
-            existing.GameTitle = game.GameTitle;
-            existing.Description = game.Description;
-            existing.GameUrl = game.GameUrl;
-            existing.ReleaseDate = game.ReleaseDate;
-            existing.GenreId = game.GenreId;
-            existing.Logo = game.Logo;
+            existing.GameTitle = dto.GameTitle;
+            existing.Description = dto.Description;
+            existing.GameUrl = dto.GameUrl;
+            existing.ReleaseDate = dto.ReleaseDate;
+            existing.GenreId = dto.GenreId;
+            existing.Logo = dto.Logo;
             existing.ModifiedDate = DateTime.UtcNow;
 
             await _uow.Games.UpdateAsync(existing);
             await _uow.SaveAsync();
 
-            _logger.LogInformation("✅ Game updated: {Title}", existing.GameTitle);
+            _cache.Remove(GamesCachePrefix);
             return NoContent();
         }
 
@@ -225,35 +129,33 @@ namespace GamesPlatform.API.Controllers
         [Authorize]
         public async Task<IActionResult> DeleteGame(int id)
         {
-            _logger.LogInformation("🗑️ Delete request for game ID: {Id}", id);
-
             var game = await _uow.Games.GetByIdAsync(id);
-            if (game == null) 
-            {
-                _logger.LogWarning("⚠️ Game not found for delete: {Id}", id);
-                return NotFound("Игра не найдена");
-            }
+            if (game == null) return NotFound();
 
-            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
-            var userRole = User.FindFirst(ClaimTypes.Role)?.Value;
-            
-            if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out var userId))
-                return Unauthorized();
+            var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+            var userRole = User.FindFirstValue(ClaimTypes.Role);
 
             if (userRole != "Admin" && game.DeveloperId != userId)
-            {
-                _logger.LogWarning("⚠️ Forbidden: User {UserId} tried to delete game {GameId} owned by {OwnerId}", 
-                    userId, id, game.DeveloperId);
-                return StatusCode(403, "Нет прав на удаление чужой игры");
-            }
+                return StatusCode(403, "Нет прав");
 
             await _uow.Games.DeleteAsync(game);
             await _uow.SaveAsync();
 
-            _logger.LogInformation("✅ Game deleted: {Title}", game.GameTitle);
+            _cache.Remove(GamesCachePrefix);
             return NoContent();
         }
-    }
 
-    
+        private static GameDto MapToDto(Game g) => new()
+        {
+            GameId = g.GameId,
+            GameTitle = g.GameTitle,
+            Description = g.Description,
+            ReleaseDate = g.ReleaseDate,
+            ModifiedDate = g.ModifiedDate,
+            Logo = g.Logo,
+            GameUrl = g.GameUrl,
+            GenreId = g.GenreId,
+            DeveloperId = g.DeveloperId
+        };
+    }
 }

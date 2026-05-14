@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace GamesPlatform.API.Models
 {
     public class GameDto
@@ -13,6 +15,25 @@ namespace GamesPlatform.API.Models
         public string GameUrl { get; set; } = string.Empty;
         public string? GenreName { get; set; }
         public string? DeveloperName { get; set; }
+    }
+
+    public class CreateGameDto
+    {
+        [JsonRequired]
+        public string GameTitle { get; set; } = string.Empty;
+        public string? Description { get; set; }
+        public DateTime ReleaseDate { get; set; } = DateTime.UtcNow;
+        public string? Logo { get; set; }
+        [JsonRequired]
+        public int GenreId { get; set; }
+        [JsonRequired]
+        public string GameUrl { get; set; } = string.Empty;
+    }
+
+    public class UpdateGameDto : CreateGameDto
+    {
+        [JsonRequired]
+        public int GameId { get; set; }
     }
 
     public class GamesQueryDto

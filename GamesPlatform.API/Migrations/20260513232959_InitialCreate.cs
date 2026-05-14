@@ -30,12 +30,14 @@ namespace GamesPlatform.API.Migrations
                 {
                     UserId = table.Column<int>(type: "INTEGER", nullable: false)
                         .Annotation("Sqlite:Autoincrement", true),
-                    UserName = table.Column<string>(type: "TEXT", maxLength: 100, nullable: false),
-                    Email = table.Column<string>(type: "TEXT", maxLength: 255, nullable: false),
+                    UserName = table.Column<string>(type: "TEXT", maxLength: 50, nullable: false),
+                    Email = table.Column<string>(type: "TEXT", maxLength: 100, nullable: false),
                     PasswordHash = table.Column<string>(type: "TEXT", nullable: false),
-                    UserType = table.Column<string>(type: "TEXT", nullable: false, defaultValue: "User"),
+                    UserType = table.Column<string>(type: "TEXT", maxLength: 20, nullable: false),
                     IsActive = table.Column<bool>(type: "INTEGER", nullable: false),
-                    RegistrationDate = table.Column<DateTime>(type: "TEXT", nullable: false)
+                    RegistrationDate = table.Column<DateTime>(type: "TEXT", nullable: false),
+                    LastLoginDate = table.Column<DateTime>(type: "TEXT", nullable: true),
+                    DateOfBirth = table.Column<DateTime>(type: "TEXT", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -49,11 +51,14 @@ namespace GamesPlatform.API.Migrations
                     GameId = table.Column<int>(type: "INTEGER", nullable: false)
                         .Annotation("Sqlite:Autoincrement", true),
                     GameTitle = table.Column<string>(type: "TEXT", maxLength: 200, nullable: false),
+                    Description = table.Column<string>(type: "TEXT", nullable: true),
                     ReleaseDate = table.Column<DateTime>(type: "TEXT", nullable: false),
                     ModifiedDate = table.Column<DateTime>(type: "TEXT", nullable: false),
                     Logo = table.Column<string>(type: "TEXT", nullable: true),
                     GenreId = table.Column<int>(type: "INTEGER", nullable: false),
-                    DeveloperId = table.Column<int>(type: "INTEGER", nullable: false)
+                    DeveloperId = table.Column<int>(type: "INTEGER", nullable: false),
+                    GameUrl = table.Column<string>(type: "TEXT", maxLength: 500, nullable: false),
+                    GenreId1 = table.Column<int>(type: "INTEGER", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -64,6 +69,11 @@ namespace GamesPlatform.API.Migrations
                         principalTable: "Genres",
                         principalColumn: "GenreId",
                         onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_Games_Genres_GenreId1",
+                        column: x => x.GenreId1,
+                        principalTable: "Genres",
+                        principalColumn: "GenreId");
                     table.ForeignKey(
                         name: "FK_Games_Users_DeveloperId",
                         column: x => x.DeveloperId,
@@ -146,6 +156,11 @@ namespace GamesPlatform.API.Migrations
                 name: "IX_Games_GenreId",
                 table: "Games",
                 column: "GenreId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Games_GenreId1",
+                table: "Games",
+                column: "GenreId1");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Ratings_GameId",

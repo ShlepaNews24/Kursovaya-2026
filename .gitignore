@@ -1,69 +1,108 @@
-# ============================================================================
-# .NET / C#
-# ============================================================================
-bin/
-obj/
-*.userprefs
-*.suo
+# Build outputs
+/bin/
+/obj/
+/out/
+/.output/
+*.exe
+*.dll
+*.pdb
+*.so
+*.dylib
+
+# Rider / Visual Studio / VS Code
+/.idea/
+/.vs/
+/.vscode/
 *.user
-*.lock.json
-.project.lock.json
-.vs/
-.idea/
-*.pidb
-*.booproj.*
+*.suo
+*.userosscache
+*.sln.docstates
+*.sln.ide
+*.csproj.user
 
-# ============================================================================
-# Visual Studio / VS Code
-# ============================================================================
-.vscode/
-!.vscode/settings.json
-!.vscode/tasks.json
-!.vscode/launch.json
-*.swp
-*.swn
-*~
+# Entity Framework Migrations history – usually tracked, but you may ignore if not needed
+# /Migrations/ – but best to keep migrations, so no rule
 
-# ============================================================================
-# SQLite Database
-# ============================================================================
+# Logs
+/logs/
+*.log
+
+# Database files (SQLite)
 *.db
 *.db-shm
 *.db-wal
-gamesplatform.db*
+gamesplatform.db
 
-# ============================================================================
-# Blazor WebAssembly
-# ============================================================================
-wwwroot/_framework/
-wwwroot/service-worker-assets.js
-wwwroot/service-worker.published.js
+# Serilog output
+logs/
 
-# ============================================================================
-# Secrets & Configuration
-# ============================================================================
-appsettings.Development.json
-appsettings.*.json
-!appsettings.json
-*.pfx
-*.cer
-*.key
-secrets.json
-user-secrets.json
+# User secrets (local development)
+/appsettings.Development.json
+/appsettings.Production.json
+/appsettings.*.json   # but keep appsettings.json and appsettings.Development.example.json if needed
 
-# ============================================================================
-# OS & Editor
-# ============================================================================
-Thumbs.db
+# Test results
+/TestResults/
+*.trx
+*.coverage
+*.coveragexml
+
+# NuGet packages / fallback packages
+/packages/
+*.nupkg
+*.snupkg
+
+# Publish output
+/publish/
+
+# Benchmark results
+BenchmarkDotNet.Artifacts/
+
+# Docker
+/.dockerignore
+
+# Node (if any frontend build is inside)
+/node_modules/
+/npm-debug.log
+/yarn-error.log
+
+# Local storage for Blazor WASM
+/.blazor/
+
+# Rider / JetBrains
+*.DotSettings.user
+*.sln.DotSettings
+*.sln.DotSettings.user
+
+# MacOS metadata
 .DS_Store
-desktop.ini
-*.log
-tmp/
-temp/
+__MACOSX
 
-# ============================================================================
-# Publish Output
-# ============================================================================
-publish/
-out/
-dist/
+# Windows temporary files
+Thumbs.db
+desktop.ini
+
+# ASP.NET Core Data Protection keys
+/DataProtection-Keys/
+
+# OpenIddict certificates (dev certificates)
+*.pfx
+*.p12
+*.crt
+*.key
+
+# IDE specific (VS Code tasks)
+.tasks/
+*.code-workspace
+
+# Client build output
+/GamesPlatform.Client/wwwroot/_framework/
+/GamesPlatform.Client/wwwroot/css/bootstrap/
+/GamesPlatform.Client/wwwroot/lib/
+
+# API static files (if any)
+/GamesPlatform.API/wwwroot/
+
+# Build artifacts from both projects
+**/bin/
+**/obj/

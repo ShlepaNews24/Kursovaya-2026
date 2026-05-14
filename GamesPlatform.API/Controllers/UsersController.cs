@@ -1,10 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using GamesPlatform.API.Data;
-using GamesPlatform.API.Models;
 using Microsoft.AspNetCore.Authorization;
 using System.Security.Claims;
 using System.ComponentModel.DataAnnotations;
+using GamesPlatform.API.Interfaces;
+using GamesPlatform.API.Models;
 
 namespace GamesPlatform.API.Controllers
 {
@@ -12,62 +11,87 @@ namespace GamesPlatform.API.Controllers
     [ApiController]
     public class UsersController : ControllerBase
     {
-        private readonly AppDbContext _context;
+        private readonly IUnitOfWork _uow;
 
-        public UsersController(AppDbContext context) => _context = context;
+        public UsersController(IUnitOfWork uow)
+        {
+            _uow = uow;
+        }
 
+        // GET: api/users (только для администратора)
         [HttpGet]
         [Authorize(Roles = "Admin")]
-        public async Task<ActionResult<IEnumerable<User>>> GetUsers()
+        public async Task<ActionResult<IEnumerable<UserDto>>> GetUsers()
         {
-            var users = await _context.Users.ToListAsync();
-            foreach (var u in users) u.PasswordHash = "";
-            return users;
+            var users = await _uow.Users.GetAllAsync();
+            var result = users.Select(u => new UserDto
+            {
+                UserId = u.UserId,
+                UserName = u.UserName,
+                Email = u.Email,
+                UserType = u.UserType,
+                IsActive = u.IsActive,
+                RegistrationDate = u.RegistrationDate,
+                LastLoginDate = u.LastLoginDate,
+                DateOfBirth = u.DateOfBirth
+            }).ToList();
+            return Ok(result);
         }
 
-        // Получение пользователя по ID
+        // GET: api/users/5
         [HttpGet("{id}")]
         [Authorize]
-        public async Task<ActionResult<User>> GetUser(int id)
+        public async Task<ActionResult<UserDto>> GetUser(int id)
         {
-            var user = await _context.Users.FindAsync(id);
+            var user = await _uow.Users.GetByIdAsync(id);
             if (user == null) return NotFound();
-            user.PasswordHash = "";
-            return user;
+            return Ok(new UserDto
+            {
+                UserId = user.UserId,
+                UserName = user.UserName,
+                Email = user.Email,
+                UserType = user.UserType,
+                IsActive = user.IsActive,
+                RegistrationDate = user.RegistrationDate,
+                LastLoginDate = user.LastLoginDate,
+                DateOfBirth = user.DateOfBirth
+            });
         }
 
-        // Смена роли пользователя
+        // PUT: api/users/5/role (только администратор)
         [HttpPut("{id}/role")]
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> UpdateUserRole(int id, [FromBody] UpdateRoleDto dto)
         {
             if (string.IsNullOrWhiteSpace(dto.UserType))
-                return BadRequest("Роль не может быть пустой");
-            
-            var user = await _context.Users.FindAsync(id);
-            if (user == null) return NotFound("Пользователь не найден");
-            
+                return BadRequest("Role cannot be empty");
+
+            var user = await _uow.Users.GetByIdAsync(id);
+            if (user == null) return NotFound("User not found");
+
             user.UserType = dto.UserType;
-            await _context.SaveChangesAsync();
-            
-            return Ok(new { message = "Роль обновлена", userName = user.UserName, userType = user.UserType });
+            await _uow.Users.UpdateAsync(user);
+            await _uow.SaveAsync();
+
+            return Ok(new { message = "Role updated", userName = user.UserName, userType = user.UserType });
         }
 
-        // Блокировка/Разблокировка пользователя
+        // PUT: api/users/5/status (только администратор)
         [HttpPut("{id}/status")]
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> UpdateUserStatus(int id, [FromBody] UpdateStatusDto dto)
         {
-            var user = await _context.Users.FindAsync(id);
-            if (user == null) return NotFound("Пользователь не найден");
-            
+            var user = await _uow.Users.GetByIdAsync(id);
+            if (user == null) return NotFound("User not found");
+
             user.IsActive = dto.IsActive;
-            await _context.SaveChangesAsync();
-            
-            return Ok(new { message = $"Пользователь {(dto.IsActive ? "разблокирован" : "заблокирован")}", isActive = user.IsActive });
+            await _uow.Users.UpdateAsync(user);
+            await _uow.SaveAsync();
+
+            return Ok(new { message = dto.IsActive ? "User unblocked" : "User blocked", isActive = user.IsActive });
         }
 
-        // Смена ника
+        // PUT: api/users/me/username (для авторизованного пользователя)
         [HttpPut("me/username")]
         [Authorize]
         public async Task<IActionResult> UpdateUsername([FromBody] UpdateUsernameDto dto)
@@ -77,24 +101,26 @@ namespace GamesPlatform.API.Controllers
                 return Unauthorized();
 
             if (string.IsNullOrWhiteSpace(dto.UserName))
-                return BadRequest("Имя не может быть пустым");
-            
+                return BadRequest("Username cannot be empty");
+
             dto.UserName = dto.UserName.Trim();
             if (dto.UserName.Length < 3 || dto.UserName.Length > 50)
-                return BadRequest("Имя должно быть от 3 до 50 символов");
+                return BadRequest("Username must be 3-50 characters");
 
-            var exists = await _context.Users.AnyAsync(u => u.UserName == dto.UserName && u.UserId != userId);
-            if (exists) return BadRequest("Имя уже занято");
+            var existingUsers = await _uow.Users.FindAsync(u => u.UserName == dto.UserName && u.UserId != userId);
+            if (existingUsers.Any()) return BadRequest("Username already taken");
 
-            var user = await _context.Users.FindAsync(userId);
+            var user = await _uow.Users.GetByIdAsync(userId);
             if (user == null) return NotFound();
 
             user.UserName = dto.UserName;
-            await _context.SaveChangesAsync();
-            return Ok(new { message = "Имя обновлено", userName = user.UserName });
+            await _uow.Users.UpdateAsync(user);
+            await _uow.SaveAsync();
+
+            return Ok(new { message = "Username updated", userName = user.UserName });
         }
 
-        // Смена даты рождения
+        // PUT: api/users/me/dateofbirth (для авторизованного пользователя)
         [HttpPut("me/dateofbirth")]
         [Authorize]
         public async Task<IActionResult> UpdateDateOfBirth([FromBody] UpdateDateOfBirthDto dto)
@@ -104,48 +130,45 @@ namespace GamesPlatform.API.Controllers
                 return Unauthorized();
 
             if (dto.DateOfBirth.HasValue && dto.DateOfBirth.Value > DateTime.UtcNow)
-                return BadRequest("Дата рождения не может быть в будущем");
+                return BadRequest("Date of birth cannot be in the future");
 
-            var user = await _context.Users.FindAsync(userId);
+            var user = await _uow.Users.GetByIdAsync(userId);
             if (user == null) return NotFound();
 
             user.DateOfBirth = dto.DateOfBirth;
-            await _context.SaveChangesAsync();
-            return Ok(new { message = "Дата рождения обновлена", dateOfBirth = user.DateOfBirth });
+            await _uow.Users.UpdateAsync(user);
+            await _uow.SaveAsync();
+
+            return Ok(new { message = "Date of birth updated", dateOfBirth = user.DateOfBirth });
         }
 
-        // Регистрация
-        [HttpPost]
-        [AllowAnonymous]
-        public async Task<ActionResult<User>> PostUser(User user)
-        {
-            user.RegistrationDate = DateTime.UtcNow;
-            user.IsActive = true;
-            user.UserType = "User"; 
-            
-            _context.Users.Add(user);
-            await _context.SaveChangesAsync();
-            
-            user.PasswordHash = "";
-            return CreatedAtAction(nameof(GetUser), new { id = user.UserId }, user);
-        }
-
-        // Удаление пользователя
+        // DELETE: api/users/5 (только администратор)
         [HttpDelete("{id}")]
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> DeleteUser(int id)
         {
-            var user = await _context.Users.FindAsync(id);
+            var user = await _uow.Users.GetByIdAsync(id);
             if (user == null) return NotFound();
-            
-            _context.Users.Remove(user);
-            await _context.SaveChangesAsync();
+            await _uow.Users.DeleteAsync(user);
+            await _uow.SaveAsync();
             return NoContent();
         }
     }
 
+    // DTOs
     public class UpdateUsernameDto { [Required] public string UserName { get; set; } = string.Empty; }
     public class UpdateDateOfBirthDto { public DateTime? DateOfBirth { get; set; } }
     public class UpdateRoleDto { [Required] public string UserType { get; set; } = string.Empty; }
     public class UpdateStatusDto { public bool IsActive { get; set; } }
+    public class UserDto
+    {
+        public int UserId { get; set; }
+        public string UserName { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public string UserType { get; set; } = string.Empty;
+        public bool IsActive { get; set; }
+        public DateTime RegistrationDate { get; set; }
+        public DateTime? LastLoginDate { get; set; }
+        public DateTime? DateOfBirth { get; set; }
+    }
 }
