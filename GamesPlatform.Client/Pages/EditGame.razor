@@ -1,0 +1,89 @@
+@page "/games/edit/{id:int}"
+@using GamesPlatform.Client.Models
+@inject IGamesService GamesService
+@inject IAuthService AuthService
+@inject NavigationManager Nav
+@inject INotificationService Notify
+
+<PageTitle>Edit Game</PageTitle>
+
+@if (isLoading)
+{
+    <div class="text-center py-5"><div class="spinner-border"></div></div>
+}
+else if (game == null)
+{
+    <div class="alert alert-danger">Game not found</div>
+}
+else
+{
+    <h3>Edit @game.GameTitle</h3>
+    <div class="card" style="max-width: 700px;">
+        <div class="card-body">
+            <form @onsubmit="HandleSubmit">
+                <div class="mb-3">
+                    <label class="form-label">Game Title *</label>
+                    <input class="form-control" @bind="game.GameTitle" required />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Description</label>
+                    <textarea class="form-control" @bind="game.Description" rows="3"></textarea>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Genre *</label>
+                    <select class="form-select" @bind="game.GenreId">
+                        @if (genres?.Any() == true)
+                        {
+                            @foreach (var g in genres)
+                            {
+                                <option value="@g.GenreId">@g.GenreName</option>
+                            }
+                        }
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Game URL *</label>
+                    <input class="form-control" @bind="game.GameUrl" required />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Logo URL</label>
+                    <input class="form-control" @bind="game.Logo" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Release Date</label>
+                    <input type="date" class="form-control" @bind="game.ReleaseDate" />
+                </div>
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary">Save</button>
+                    <a href="/game/@id" class="btn btn-secondary">Cancel</a>
+                </div>
+            </form>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public int id { get; set; }
+    private GameDto? game;
+    private List<GenreDto>? genres;
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        game = await GamesService.GetGameAsync(id);
+        genres = await GamesService.GetGenresAsync();
+        isLoading = false;
+    }
+
+    private async Task HandleSubmit()
+    {
+        if (string.IsNullOrWhiteSpace(game?.GameTitle) || string.IsNullOrWhiteSpace(game?.GameUrl) || game.GenreId == 0)
+        {
+            Notify.Show("Please fill all required fields", "error");
+            return;
+        }
+        var success = await GamesService.UpdateGameAsync(game);
+        if (success) Nav.NavigateTo($"/game/{id}");
+        else Notify.Show("Failed to update game", "error");
+    }
+}

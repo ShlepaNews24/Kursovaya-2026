@@ -1,0 +1,108 @@
+# Build outputs
+/bin/
+/obj/
+/out/
+/.output/
+*.exe
+*.dll
+*.pdb
+*.so
+*.dylib
+
+# Rider / Visual Studio / VS Code
+/.idea/
+/.vs/
+/.vscode/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.sln.ide
+*.csproj.user
+
+# Entity Framework Migrations history – usually tracked, but you may ignore if not needed
+# /Migrations/ – but best to keep migrations, so no rule
+
+# Logs
+/logs/
+*.log
+
+# Database files (SQLite)
+*.db
+*.db-shm
+*.db-wal
+gamesplatform.db
+
+# Serilog output
+logs/
+
+# User secrets (local development)
+/appsettings.Development.json
+/appsettings.Production.json
+/appsettings.*.json   # but keep appsettings.json and appsettings.Development.example.json if needed
+
+# Test results
+/TestResults/
+*.trx
+*.coverage
+*.coveragexml
+
+# NuGet packages / fallback packages
+/packages/
+*.nupkg
+*.snupkg
+
+# Publish output
+/publish/
+
+# Benchmark results
+BenchmarkDotNet.Artifacts/
+
+# Docker
+/.dockerignore
+
+# Node (if any frontend build is inside)
+/node_modules/
+/npm-debug.log
+/yarn-error.log
+
+# Local storage for Blazor WASM
+/.blazor/
+
+# Rider / JetBrains
+*.DotSettings.user
+*.sln.DotSettings
+*.sln.DotSettings.user
+
+# MacOS metadata
+.DS_Store
+__MACOSX
+
+# Windows temporary files
+Thumbs.db
+desktop.ini
+
+# ASP.NET Core Data Protection keys
+/DataProtection-Keys/
+
+# OpenIddict certificates (dev certificates)
+*.pfx
+*.p12
+*.crt
+*.key
+
+# IDE specific (VS Code tasks)
+.tasks/
+*.code-workspace
+
+# Client build output
+/GamesPlatform.Client/wwwroot/_framework/
+/GamesPlatform.Client/wwwroot/css/bootstrap/
+/GamesPlatform.Client/wwwroot/lib/
+
+# API static files (if any)
+/GamesPlatform.API/wwwroot/
+
+# Build artifacts from both projects
+**/bin/
+**/obj/

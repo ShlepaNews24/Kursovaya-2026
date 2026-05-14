@@ -1,0 +1,108 @@
+/* Общие стили */
+:root {
+    --primary-color: #4e5d78;
+    --secondary-color: #6c757d;
+    --sidebar-width: 250px;
+}
+
+.page {
+    position: relative;
+    display: flex;
+    flex-direction: row;
+    min-height: 100vh;
+}
+
+.sidebar {
+    width: var(--sidebar-width);
+    background: linear-gradient(180deg, #1e3a5f 0%, #0d1b2a 100%);
+    min-height: 100vh;
+    box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+}
+
+main {
+    flex: 1;
+    background-color: #f8f9fa;
+}
+
+.top-row {
+    background-color: #ffffff;
+    border-bottom: 1px solid #dee2e6;
+    height: 3.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.content {
+    padding-top: 2rem;
+    padding-bottom: 2rem;
+    min-height: calc(100vh - 3.5rem);
+}
+
+/* Карточки */
+.card {
+    border: none;
+    border-radius: 12px;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.1) !important;
+}
+
+/* Кнопки */
+.btn {
+    border-radius: 8px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border: none;
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+/* Навигация */
+.navbar-brand {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #ffffff !important;
+}
+
+/* Toast уведомления */
+.toast-container {
+    z-index: 9999;
+}
+
+.toast {
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+    .sidebar {
+        width: 100%;
+        min-height: auto;
+    }
+    
+    .page {
+        flex-direction: column;
+    }
+}
+
+/* Hero секция */
+.display-4 {
+    font-weight: 700;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}

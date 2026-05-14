@@ -1,0 +1,83 @@
+@page "/"
+@inject IAuthService AuthService
+@inject NavigationManager Nav
+
+<PageTitle><span>Games Platform - Главная</span></PageTitle>
+
+<div class="container py-5">
+    <div class="row mb-5">
+        <div class="col-md-12 text-center">
+            <h1 class="display-4">🎮 Games Platform</h1>
+            <p class="lead text-muted">Платформа браузерных игр</p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-4 mb-4">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body text-center">
+                    <div class="mb-3">
+                        <span style="font-size: 3rem;">🎯</span>
+                    </div>
+                    <h5 class="card-title"><span>Играйте</span></h5>
+                    <p class="card-text text-muted"><span>Доступ к сотням браузерных игр в один клик</span></p>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4 mb-4">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body text-center">
+                    <div class="mb-3">
+                        <span style="font-size: 3rem;">📤</span>
+                    </div>
+                    <h5 class="card-title"><span>Загружайте</span></h5>
+                    <p class="card-text text-muted"><span>Делитесь своими играми с сообществом</span></p>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4 mb-4">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body text-center">
+                    <div class="mb-3">
+                        <span style="font-size: 3rem;">💬</span>
+                    </div>
+                    <h5 class="card-title"><span>Общайтесь</span></h5>
+                    <p class="card-text text-muted"><span>Оставляйте комментарии и оценки</span></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-5">
+        <div class="col-md-12 text-center">
+            @if (isAuthenticated)
+            {
+                <a href="/games" class="btn btn-primary btn-lg px-5">
+                    <span>🎮 Перейти к каталогу игр</span>
+                </a>
+            }
+            else
+            {
+                <div>
+                    <a href="/login" class="btn btn-primary btn-lg px-4 me-2">
+                        <span>🔐 Войти</span>
+                    </a>
+                    <a href="/register" class="btn btn-outline-primary btn-lg px-4">
+                        <span>📝 Регистрация</span>
+                    </a>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private bool isAuthenticated = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        isAuthenticated = await AuthService.IsAuthenticatedAsync();
+    }
+}

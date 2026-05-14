@@ -1,0 +1,98 @@
+@page "/games"
+@inject IGamesService GamesService
+@inject INotificationService Notify
+
+<PageTitle>Games Catalog</PageTitle>
+
+<h3>Games Catalog</h3>
+
+<div class="row mb-3">
+    <div class="col-md-6">
+        <input type="text" class="form-control" placeholder="Поиск по названию..." @bind="searchText" />
+    </div>
+    <div class="col-md-3">
+        <button class="btn btn-primary w-100" @onclick="LoadGames">Найти</button>
+    </div>
+</div>
+
+@if (isLoading)
+{
+    <div class="text-center py-5">
+        <div class="spinner-border text-primary"></div>
+        <p class="mt-2">Загрузка...</p>
+    </div>
+}
+else if (pagedGames.Items.Count == 0)
+{
+    <div class="alert alert-info">Игры не найдены.</div>
+}
+else
+{
+    <div class="row g-3">
+        @foreach (var game in pagedGames.Items)
+        {
+            <div class="col-6 col-sm-4 col-md-3 col-lg-2">
+                <div class="card h-100 shadow-sm text-center" style="max-width: 200px; margin: 0 auto;">
+                    @if (!string.IsNullOrEmpty(game.Logo))
+                    {
+                        <img src="@game.Logo" 
+                             style="width: 150px; height: 150px; object-fit: cover; margin-top: 0.75rem; display: block; margin-left: auto; margin-right: auto;" 
+                             alt="@game.GameTitle" />
+                    }
+                    else
+                    {
+                        <div class="bg-secondary d-flex align-items-center justify-content-center text-white" 
+                             style="width: 150px; height: 150px; margin-top: 0.75rem; margin-left: auto; margin-right: auto;">
+                            <span>No Logo</span>
+                        </div>
+                    }
+                    <div class="card-body p-2">
+                        <h6 class="card-title mb-1">@game.GameTitle</h6>
+                        <p class="card-text text-muted small mb-2">@(game.GenreName ?? "Unknown Genre")</p>
+                        <a href="/game/@game.GameId" class="btn btn-primary btn-sm w-100">Играть / Подробнее</a>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+
+    <nav aria-label="Page navigation" class="mt-4">
+        <ul class="pagination justify-content-center">
+            <li class="page-item @(currentPage == 1 ? "disabled" : "")">
+                <button class="page-link" @onclick="() => ChangePage(currentPage - 1)" disabled="@(currentPage == 1)">← Пред.</button>
+            </li>
+            <li class="page-item disabled">
+                <span class="page-link">Стр. @currentPage из @pagedGames.TotalPages</span>
+            </li>
+            <li class="page-item @(currentPage == pagedGames.TotalPages ? "disabled" : "")">
+                <button class="page-link" @onclick="() => ChangePage(currentPage + 1)" disabled="@(currentPage == pagedGames.TotalPages)">След. →</button>
+            </li>
+        </ul>
+    </nav>
+}
+
+@code {
+    private PagedResult<GameDto> pagedGames = new();
+    private int currentPage = 1;
+    private int pageSize = 12; // увеличил, раз карточки стали меньше
+    private string searchText = "";
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync() => await LoadGames();
+
+    private async Task LoadGames()
+    {
+        isLoading = true;
+        StateHasChanged();
+        pagedGames = await GamesService.GetGamesAsync(currentPage, pageSize, searchText);
+        isLoading = false;
+        StateHasChanged();
+    }
+
+    private async Task ChangePage(int newPage)
+    {
+        if (newPage < 1 || newPage > pagedGames.TotalPages) return;
+        currentPage = newPage;
+        await LoadGames();
+    }
+}
