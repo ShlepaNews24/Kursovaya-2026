@@ -1,6 +1,4 @@
-// [НАЗНАЧЕНИЕ] Сервис для работы с играми, комментариями и рейтингами
-// [ФАЙЛ] Services/GamesService.cs
-
+// Сервис для работы с играми, комментариями и рейтингами
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -12,7 +10,7 @@ namespace GamesPlatform.Client.Services
     {
         private readonly HttpClient _http;
         private readonly INotificationService _notify;
-        private readonly IAuthService _authService; // ✅ Для получения токена
+        private readonly IAuthService _authService;
 
         public GamesService(HttpClient http, INotificationService notify, IAuthService authService)
         {
@@ -21,9 +19,9 @@ namespace GamesPlatform.Client.Services
             _authService = authService;
         }
 
-        // ========================================================================
-        // [ПАГИНАЦИЯ] Получение списка игр с фильтрами
-        // ========================================================================
+       
+        // Получение списка игр с фильтрами
+        
         public async Task<PagedResult<GameDto>> GetGamesAsync(
             int pageNumber = 1, 
             int pageSize = 10, 
@@ -49,10 +47,7 @@ namespace GamesPlatform.Client.Services
                 return new PagedResult<GameDto>();
             }
         }
-
-        // ========================================================================
-        // [GET] Получение одной игры по ID
-        // ========================================================================
+        
         public async Task<GameDto?> GetGameAsync(int id)
         {
             try 
@@ -66,9 +61,7 @@ namespace GamesPlatform.Client.Services
             }
         }
 
-        // ========================================================================
-        // [POST] Добавление новой игры (с токеном)
-        // ========================================================================
+        // Добавление новой игры (с токеном)
         public async Task<bool> AddGameAsync(GameDto game)
         {
             try
@@ -103,9 +96,9 @@ namespace GamesPlatform.Client.Services
             }
         }
 
-        // ========================================================================
-        // [PUT] Обновление существующей игры (с токеном)
-        // ========================================================================
+
+        // Обновление существующей игры
+
         public async Task<bool> UpdateGameAsync(GameDto game)
         {
             try
@@ -140,9 +133,9 @@ namespace GamesPlatform.Client.Services
             }
         }
 
-        // ========================================================================
-        // [DELETE] Удаление игры (с токеном)
-        // ========================================================================
+
+        // Удаление игры
+
         public async Task<bool> DeleteGameAsync(int id)
         {
             try
@@ -175,9 +168,9 @@ namespace GamesPlatform.Client.Services
             }
         }
 
-        // ========================================================================
-        // [GET] Получение комментариев для игры
-        // ========================================================================
+
+        // Получение комментариев для игры
+
         public async Task<List<CommentDto>?> GetCommentsAsync(int gameId)
         {
             try 
@@ -190,9 +183,9 @@ namespace GamesPlatform.Client.Services
             }
         }
 
-        // ========================================================================
-        // [POST] Добавление комментария (с токеном)
-        // ========================================================================
+
+        // Добавление комментария
+
         public async Task<bool> AddCommentAsync(CommentDto comment)
         {
             try
@@ -217,9 +210,9 @@ namespace GamesPlatform.Client.Services
             }
         }
 
-        // ========================================================================
-        // [DELETE] Удаление комментария (с токеном)
-        // ========================================================================
+
+        // Удаление комментария
+
         public async Task<bool> DeleteCommentAsync(int commentId)
         {
             try
@@ -243,15 +236,12 @@ namespace GamesPlatform.Client.Services
             }
         }
 
-        // ========================================================================
-        // [GET] Получение сводки рейтинга игры
-        // ✅ Маршрут: /api/ratings/game/{gameId} (как в вашем контроллере)
-        // ========================================================================
+        // Получение сводки рейтинга игры
+
         public async Task<RatingSummaryDto?> GetRatingAsync(int gameId)
         {
             try 
             { 
-                // ✅ Правильный маршрут, как в RatingsController
                 return await _http.GetFromJsonAsync<RatingSummaryDto>($"api/ratings/game/{gameId}"); 
             }
             catch (Exception ex)
@@ -261,15 +251,11 @@ namespace GamesPlatform.Client.Services
             }
         }
 
-        // ========================================================================
-        // [POST] Отправка оценки за игру (с токеном)
-        // ✅ Явно передаёт токен, чтобы избежать ошибки 401
-        // ========================================================================
+        // Отправка оценки за игру
         public async Task<bool> AddRatingAsync(int gameId, int ratingValue)
         {
             try
             {
-                // ✅ Получаем токен через AuthService
                 var token = await _authService.GetTokenAsync();
                 
                 if (string.IsNullOrEmpty(token))
@@ -278,7 +264,6 @@ namespace GamesPlatform.Client.Services
                     return false;
                 }
 
-                // ✅ Создаём запрос с заголовком Authorization
                 using var request = new HttpRequestMessage(HttpMethod.Post, "api/ratings");
                 request.Content = JsonContent.Create(new { gameId = gameId, ratingValue = ratingValue });
                 request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
@@ -301,9 +286,9 @@ namespace GamesPlatform.Client.Services
             }
         }
 
-        // ========================================================================
-        // [GET] Получение списка жанров
-        // ========================================================================
+
+        // Получение списка жанров
+
         public async Task<List<GenreDto>?> GetGenresAsync()
         {
             try 

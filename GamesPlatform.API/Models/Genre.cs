@@ -6,7 +6,6 @@ namespace GamesPlatform.API.Models
         public int GenreId { get; set; }
         public string GenreName { get; set; } = string.Empty;
 
-        // Навигационное свойство
         public ICollection<Game> Games { get; set; } = new List<Game>();
     }
 }

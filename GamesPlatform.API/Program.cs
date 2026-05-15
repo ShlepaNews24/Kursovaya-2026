@@ -30,11 +30,9 @@ try
     var builder = WebApplication.CreateBuilder(args);
     builder.Host.UseSerilog();
 
-    // Database
     builder.Services.AddDbContext<AppDbContext>(options =>
         options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-    // JWT settings
     var jwtKey = builder.Configuration["JwtSettings:SecretKey"] ?? "SuperSecretKeyForDevelopment1234567890!";
     var jwtIssuer = builder.Configuration["JwtSettings:Issuer"] ?? "GamesPlatformAPI";
     var jwtAudience = builder.Configuration["JwtSettings:Audience"] ?? "GamesPlatformClient";
@@ -57,14 +55,12 @@ try
 
     builder.Services.AddAuthorization();
 
-    // DI
     builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
     builder.Services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
     builder.Services.AddScoped<IAuthService, AuthService>();
 
     builder.Services.AddMemoryCache();
 
-    // Controllers
     builder.Services.AddControllers()
         .AddJsonOptions(options =>
         {

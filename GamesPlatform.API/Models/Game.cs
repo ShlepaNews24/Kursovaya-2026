@@ -1,5 +1,3 @@
-// [ФАЙЛ] GamesPlatform.API/Models/Game.cs
-
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
@@ -13,7 +11,6 @@ namespace GamesPlatform.API.Models
         [Required, MaxLength(200)]
         public string GameTitle { get; set; } = string.Empty;
         
-        // ✅ Новое поле
         public string? Description { get; set; }
         
         public DateTime ReleaseDate { get; set; }

@@ -184,7 +184,6 @@ else
 
     private async Task SubmitRating(int value)
     {
-        // Защита от некорректных значений (на случай, если всё же придет 6)
         if (value < 1) value = 1;
         if (value > 5) value = 5;
 

@@ -1,5 +1,4 @@
-@* [НАЗНАЧЕНИЕ] Панель администратора *@
-@* [ФАЙЛ] Pages/AdminPanel.razor *@
+@* Панель администратора *@
 @page "/admin"
 @inject IAuthService AuthService
 @inject INotificationService Notify
@@ -104,8 +103,8 @@ else
     private bool isProcessing = false;
     private string userRole = "";
     private string activeTab = "users";
-    private List<Models.UserDto>? users; // ✅ Явное указание пространства имён
-    private Models.UserDto? userToDelete; // ✅ Явное указание пространства имён
+    private List<Models.UserDto>? users;
+    private Models.UserDto? userToDelete;
 
     protected override async Task OnInitializedAsync()
     {
@@ -121,7 +120,7 @@ else
         isLoaded = true;
     }
 
-    private async Task ToggleRole(Models.UserDto user) // ✅ Явное указание пространства имён
+    private async Task ToggleRole(Models.UserDto user)
     {
         isProcessing = true;
         StateHasChanged();
@@ -137,7 +136,7 @@ else
         finally { isProcessing = false; StateHasChanged(); }
     }
 
-    private async Task ToggleStatus(Models.UserDto user) // ✅ Явное указание пространства имён
+    private async Task ToggleStatus(Models.UserDto user)
     {
         isProcessing = true;
         StateHasChanged();
@@ -152,11 +151,10 @@ else
         finally { isProcessing = false; StateHasChanged(); }
     }
 
-    private void ConfirmDelete(Models.UserDto user) // ✅ Явное указание пространства имён
+    private void ConfirmDelete(Models.UserDto user)
     {
         userToDelete = user;
-        // Можно добавить модальное окно подтверждения
-        _ = DeleteUser(); // ✅ Добавлен _ = для подавления предупреждения
+        _ = DeleteUser();
     }
 
     private async Task DeleteUser()
@@ -166,7 +164,6 @@ else
         StateHasChanged();
         try
         {
-            // ✅ Добавлен await
             if (await AuthService.DeleteUserAsync(userToDelete.UserId))
             {
                 users?.Remove(userToDelete);

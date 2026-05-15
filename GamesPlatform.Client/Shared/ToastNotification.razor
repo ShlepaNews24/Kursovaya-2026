@@ -1,5 +1,4 @@
-@* [НАЗНАЧЕНИЕ] Компонент всплывающих уведомлений (toast) *@
-@* [ФАЙЛ] Shared/ToastNotification.razor *@
+@* Компонент всплывающих уведомлений *@
 @inject INotificationService Notify
 
 @if (showNotification)
@@ -25,7 +24,6 @@
 
     private async void ShowNotificationHandler(string msg, string type)
     {
-        // [ОТМЕНА ПРЕДЫДУЩЕГО ТАЙМЕРА] Если уже есть активное уведомление
         _cts?.Cancel();
         _cts = new CancellationTokenSource();
 
@@ -36,10 +34,8 @@
 
         try
         {
-            // ✅ ИСПРАВЛЕНО: Используем простой await вместо TaskScheduler
             await Task.Delay(5000, _cts.Token);
             
-            // Проверяем, не было ли отмены
             if (!_cts.IsCancellationRequested)
             {
                 await InvokeAsync(() => {
@@ -50,7 +46,7 @@
         }
         catch (TaskCanceledException)
         {
-            // [ОЖИДАЕМО] Таймер отменён новым уведомлением — ничего не делаем
+            
         }
     }
 

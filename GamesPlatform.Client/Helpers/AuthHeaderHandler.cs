@@ -1,4 +1,3 @@
-// DelegatingHandler для автоматического добавления токена к запросам
 using System.Net.Http;
 using System.Net.Http.Headers;
 using Microsoft.JSInterop;
@@ -11,7 +10,6 @@ namespace GamesPlatform.Client.Helpers
 
         public AuthHeaderHandler(IJSRuntime js) => _js = js;
 
-        // Перехват запроса и добавление Authorization-заголовка
         protected override async Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request, CancellationToken cancellationToken)
         {

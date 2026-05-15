@@ -18,7 +18,6 @@ namespace GamesPlatform.API.Controllers
             _uow = uow;
         }
 
-        // GET: api/users (только для администратора)
         [HttpGet]
         [Authorize(Roles = "Admin")]
         public async Task<ActionResult<IEnumerable<UserDto>>> GetUsers()
@@ -38,7 +37,6 @@ namespace GamesPlatform.API.Controllers
             return Ok(result);
         }
 
-        // GET: api/users/5
         [HttpGet("{id}")]
         [Authorize]
         public async Task<ActionResult<UserDto>> GetUser(int id)
@@ -58,7 +56,6 @@ namespace GamesPlatform.API.Controllers
             });
         }
 
-        // PUT: api/users/5/role (только администратор)
         [HttpPut("{id}/role")]
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> UpdateUserRole(int id, [FromBody] UpdateRoleDto dto)
@@ -76,7 +73,6 @@ namespace GamesPlatform.API.Controllers
             return Ok(new { message = "Role updated", userName = user.UserName, userType = user.UserType });
         }
 
-        // PUT: api/users/5/status (только администратор)
         [HttpPut("{id}/status")]
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> UpdateUserStatus(int id, [FromBody] UpdateStatusDto dto)
@@ -91,7 +87,6 @@ namespace GamesPlatform.API.Controllers
             return Ok(new { message = dto.IsActive ? "User unblocked" : "User blocked", isActive = user.IsActive });
         }
 
-        // PUT: api/users/me/username (для авторизованного пользователя)
         [HttpPut("me/username")]
         [Authorize]
         public async Task<IActionResult> UpdateUsername([FromBody] UpdateUsernameDto dto)
@@ -120,7 +115,6 @@ namespace GamesPlatform.API.Controllers
             return Ok(new { message = "Username updated", userName = user.UserName });
         }
 
-        // PUT: api/users/me/dateofbirth (для авторизованного пользователя)
         [HttpPut("me/dateofbirth")]
         [Authorize]
         public async Task<IActionResult> UpdateDateOfBirth([FromBody] UpdateDateOfBirthDto dto)
@@ -142,7 +136,6 @@ namespace GamesPlatform.API.Controllers
             return Ok(new { message = "Date of birth updated", dateOfBirth = user.DateOfBirth });
         }
 
-        // DELETE: api/users/5 (только администратор)
         [HttpDelete("{id}")]
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> DeleteUser(int id)
@@ -155,7 +148,6 @@ namespace GamesPlatform.API.Controllers
         }
     }
 
-    // DTOs
     public class UpdateUsernameDto { [Required] public string UserName { get; set; } = string.Empty; }
     public class UpdateDateOfBirthDto { public DateTime? DateOfBirth { get; set; } }
     public class UpdateRoleDto { [Required] public string UserType { get; set; } = string.Empty; }
