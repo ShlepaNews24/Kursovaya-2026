@@ -39,8 +39,12 @@ namespace GamesPlatform.Tests
             _mockUow.Setup(u => u.GetPagedGamesAsync(1, 10, null, null))
                 .ReturnsAsync((expectedItems, 1));
 
-            var query = new GamesQueryDto { PageNumber = 1, PageSize = 10 };
+            // Настройка кеша, чтобы он не мешал (возвращаем false, чтобы выполнился реальный метод)
+            object? cacheEntry = null;
+            _mockCache.Setup(x => x.TryGetValue(It.IsAny<object>(), out cacheEntry)).Returns(false);
+            _mockCache.Setup(x => x.CreateEntry(It.IsAny<object>())).Returns(Mock.Of<ICacheEntry>);
 
+            var query = new GamesQueryDto { PageNumber = 1, PageSize = 10 };
             var result = await _controller.GetGames(query);
 
             var okResult = Assert.IsType<OkObjectResult>(result.Result);
@@ -100,7 +104,6 @@ namespace GamesPlatform.Tests
             _mockUow.Setup(u => u.Games).Returns(mockGamesRepo.Object);
 
             var result = await _controller.GetGame(999);
-
             Assert.IsType<NotFoundObjectResult>(result.Result);
         }
     }

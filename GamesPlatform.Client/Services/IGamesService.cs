@@ -15,5 +15,6 @@ namespace GamesPlatform.Client.Services
         Task<RatingSummaryDto?> GetRatingAsync(int gameId);
         Task<bool> AddRatingAsync(int gameId, int ratingValue);
         Task<List<GenreDto>?> GetGenresAsync();
+        Task<string?> UploadLogoAsync(Stream fileStream, string fileName);
     }
 }

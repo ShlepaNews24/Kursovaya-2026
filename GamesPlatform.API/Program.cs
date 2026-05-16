@@ -10,6 +10,7 @@ using GamesPlatform.API.Data;
 using GamesPlatform.API.Features.Auth;
 using GamesPlatform.API.Interfaces;
 using GamesPlatform.API.Repositories;
+using GamesPlatform.API.Services;
 
 Log.Logger = new LoggerConfiguration()
     .MinimumLevel.Override("Microsoft", LogEventLevel.Information)
@@ -58,6 +59,8 @@ try
     builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
     builder.Services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
     builder.Services.AddScoped<IAuthService, AuthService>();
+    builder.Services.AddScoped<IFileService, FileService>();
+    builder.Services.AddHttpContextAccessor(); // 👈 обязательно
 
     builder.Services.AddMemoryCache();
 
@@ -110,7 +113,7 @@ try
 
     app.UseHttpsRedirection();
     app.UseCors("AllowAll");
-    app.UseStaticFiles();
+    app.UseStaticFiles(); // чтобы раздавать файлы из wwwroot
     app.UseAuthentication();
     app.UseAuthorization();
     app.MapControllers();

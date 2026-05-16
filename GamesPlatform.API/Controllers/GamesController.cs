@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using System.Security.Claims;
 using GamesPlatform.API.Interfaces;
 using GamesPlatform.API.Models;
+using GamesPlatform.API.Services;
 
 namespace GamesPlatform.API.Controllers
 {
@@ -12,11 +13,13 @@ namespace GamesPlatform.API.Controllers
     {
         private readonly IUnitOfWork _uow;
         private readonly ILogger<GamesController> _logger;
+        private readonly IFileService _fileService;
 
-        public GamesController(IUnitOfWork uow, ILogger<GamesController> logger)
+        public GamesController(IUnitOfWork uow, ILogger<GamesController> logger, IFileService fileService)
         {
             _uow = uow;
             _logger = logger;
+            _fileService = fileService;
         }
 
         [HttpGet]
@@ -132,6 +135,22 @@ namespace GamesPlatform.API.Controllers
             return NoContent();
         }
 
+        [HttpPost("upload-logo")]
+        [Authorize]
+        public async Task<ActionResult<UploadLogoResponse>> UploadLogo(IFormFile file)
+        {
+            _logger.LogInformation("Upload logo request from user {UserId}", User.FindFirstValue(ClaimTypes.NameIdentifier));
+
+            if (!_fileService.IsValidFile(file, out var errorMessage))
+                return BadRequest(new { error = errorMessage });
+
+            var filePath = await _fileService.UploadFileAsync(file, "uploads");
+            if (filePath == null)
+                return StatusCode(500, new { error = "Ошибка при загрузке файла" });
+
+            return Ok(new UploadLogoResponse { LogoUrl = filePath });
+        }
+
         private static GameDto MapToDto(Game g) => new()
         {
             GameId = g.GameId,
@@ -144,5 +163,10 @@ namespace GamesPlatform.API.Controllers
             GenreId = g.GenreId,
             DeveloperId = g.DeveloperId
         };
+    }
+
+    public class UploadLogoResponse
+    {
+        public string LogoUrl { get; set; } = string.Empty;
     }
 }

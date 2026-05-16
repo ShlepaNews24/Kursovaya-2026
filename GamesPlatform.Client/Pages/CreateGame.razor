@@ -58,7 +58,21 @@ else
                 </div>
 
                 <div class="mb-3">
-                    <label class="form-label">Logo URL</label>
+                    <label class="form-label">Logo (Upload from file)</label>
+                    <InputFile OnChange="OnLogoFileSelected" class="form-control" accept="image/jpeg,image/png,image/gif,image/webp" />
+                    <ValidationMessage For="@(() => model.Logo)" />
+                    <small class="text-muted d-block">Max 5 MB, formats: JPG, PNG, GIF, WEBP</small>
+                    @if (!string.IsNullOrEmpty(uploadedLogoUrl))
+                    {
+                        <div class="mt-2">
+                            <img src="@uploadedLogoUrl" style="height: 80px;" />
+                            <button type="button" class="btn btn-sm btn-danger ms-2" @onclick="ClearUploadedLogo">Remove</button>
+                        </div>
+                    }
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Logo URL (or enter manually)</label>
                     <InputText class="form-control" @bind-Value="model.Logo" placeholder="https://..." />
                     <ValidationMessage For="@(() => model.Logo)" />
                 </div>
@@ -93,8 +107,10 @@ else
 @code {
     private bool isAuthenticated = false;
     private bool isSubmitting = false;
+    private bool isUploadingLogo = false;
     private List<GenreDto>? genres;
     private CreateGameViewModel model = new();
+    private string? uploadedLogoUrl;
 
     protected override async Task OnInitializedAsync()
     {
@@ -103,6 +119,50 @@ else
         {
             genres = await GamesService.GetGenresAsync();
         }
+    }
+
+    private async Task OnLogoFileSelected(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        if (file == null) return;
+
+        if (file.Size > 5 * 1024 * 1024)
+        {
+            Notify.Show("File size must be less than 5 MB", "error");
+            return;
+        }
+
+        var allowedTypes = new[] { "image/jpeg", "image/png", "image/gif", "image/webp" };
+        if (!allowedTypes.Contains(file.ContentType))
+        {
+            Notify.Show("Allowed formats: JPG, PNG, GIF, WEBP", "error");
+            return;
+        }
+
+        isUploadingLogo = true;
+        StateHasChanged();
+
+        try
+        {
+            await using var stream = file.OpenReadStream(maxAllowedSize: 5 * 1024 * 1024);
+            var url = await GamesService.UploadLogoAsync(stream, file.Name);
+            if (url != null)
+            {
+                uploadedLogoUrl = url;
+                model.Logo = url;
+            }
+        }
+        finally
+        {
+            isUploadingLogo = false;
+            StateHasChanged();
+        }
+    }
+
+    private void ClearUploadedLogo()
+    {
+        uploadedLogoUrl = null;
+        model.Logo = null;
     }
 
     private async Task HandleCreateGame()

@@ -96,4 +96,10 @@ namespace GamesPlatform.Client.Models
         [JsonPropertyName("pageSize")] public int PageSize { get; set; }
         [JsonPropertyName("totalPages")] public int TotalPages { get; set; }
     }
+
+    public class UploadLogoResponse
+    {
+        [JsonPropertyName("logoUrl")]
+        public string LogoUrl { get; set; } = string.Empty;
+    }
 }

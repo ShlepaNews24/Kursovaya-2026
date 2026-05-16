@@ -47,7 +47,7 @@ namespace GamesPlatform.Client.Models
         [Url(ErrorMessage = "Invalid URL format")]
         public string GameUrl { get; set; } = string.Empty;
 
-        [Url(ErrorMessage = "Invalid logo URL format")]
+        [MaxLength(500, ErrorMessage = "Logo URL cannot exceed 500 characters")]
         public string? Logo { get; set; }
 
         public DateTime ReleaseDate { get; set; } = DateTime.UtcNow;

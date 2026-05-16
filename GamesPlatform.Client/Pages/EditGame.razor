@@ -9,7 +9,10 @@
 
 @if (isLoading)
 {
-    <div class="text-center py-5"><div class="spinner-border"></div></div>
+    <div class="text-center py-5">
+        <div class="spinner-border text-primary"></div>
+        <p>Loading...</p>
+    </div>
 }
 else if (game == null)
 {
@@ -45,16 +48,48 @@ else
                     <label class="form-label">Game URL *</label>
                     <input class="form-control" @bind="game.GameUrl" required />
                 </div>
+
+                <!-- Загрузка нового логотипа -->
                 <div class="mb-3">
-                    <label class="form-label">Logo URL</label>
-                    <input class="form-control" @bind="game.Logo" />
+                    <label class="form-label">Upload New Logo</label>
+                    <InputFile OnChange="OnLogoFileSelected" accept="image/jpeg,image/png,image/gif,image/webp" />
+                    <small class="text-muted d-block">Max 5 MB, formats: JPG, PNG, GIF, WEBP</small>
+                    @if (!string.IsNullOrEmpty(uploadedLogoUrl))
+                    {
+                        <div class="mt-2">
+                            <img src="@uploadedLogoUrl" style="height: 80px;" />
+                            <button type="button" class="btn btn-sm btn-danger ms-2" @onclick="ClearUploadedLogo">Use new logo</button>
+                        </div>
+                    }
                 </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Logo URL (or enter manually)</label>
+                    <input class="form-control" @bind="game.Logo" />
+                    @if (!string.IsNullOrEmpty(game.Logo) && string.IsNullOrEmpty(uploadedLogoUrl))
+                    {
+                        <div class="mt-2">
+                            <img src="@game.Logo" style="height: 80px;" />
+                        </div>
+                    }
+                </div>
+
                 <div class="mb-3">
                     <label class="form-label">Release Date</label>
                     <input type="date" class="form-control" @bind="game.ReleaseDate" />
                 </div>
                 <div class="d-flex gap-2">
-                    <button type="submit" class="btn btn-primary">Save</button>
+                    <button type="submit" class="btn btn-primary" disabled="@isSubmitting">
+                        @if (isSubmitting)
+                        {
+                            <span class="spinner-border spinner-border-sm"></span>
+                            <span>Saving...</span>
+                        }
+                        else
+                        {
+                            <span>Save Changes</span>
+                        }
+                    </button>
                     <a href="/game/@id" class="btn btn-secondary">Cancel</a>
                 </div>
             </form>
@@ -67,23 +102,80 @@ else
     private GameDto? game;
     private List<GenreDto>? genres;
     private bool isLoading = true;
+    private bool isSubmitting = false;
+    private string? uploadedLogoUrl;
 
     protected override async Task OnInitializedAsync()
     {
+        isLoading = true;
         game = await GamesService.GetGameAsync(id);
         genres = await GamesService.GetGenresAsync();
         isLoading = false;
     }
 
+    private async Task OnLogoFileSelected(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        if (file == null) return;
+
+        if (file.Size > 5 * 1024 * 1024)
+        {
+            Notify.Show("File size must be less than 5 MB", "error");
+            return;
+        }
+
+        var allowedTypes = new[] { "image/jpeg", "image/png", "image/gif", "image/webp" };
+        if (!allowedTypes.Contains(file.ContentType))
+        {
+            Notify.Show("Allowed formats: JPG, PNG, GIF, WEBP", "error");
+            return;
+        }
+
+        try
+        {
+            await using var stream = file.OpenReadStream(maxAllowedSize: 5 * 1024 * 1024);
+            var url = await GamesService.UploadLogoAsync(stream, file.Name);
+            if (url != null && game != null)
+            {
+                uploadedLogoUrl = url;
+                game.Logo = url;
+                Notify.Show("Logo uploaded successfully", "success");
+            }
+        }
+        catch (Exception ex)
+        {
+            Notify.Show($"Upload failed: {ex.Message}", "error");
+        }
+    }
+
+    private void ClearUploadedLogo()
+    {
+        uploadedLogoUrl = null;
+        if (game != null) game.Logo = null;
+    }
+
     private async Task HandleSubmit()
     {
-        if (string.IsNullOrWhiteSpace(game?.GameTitle) || string.IsNullOrWhiteSpace(game?.GameUrl) || game.GenreId == 0)
+        if (game == null) return;
+        if (string.IsNullOrWhiteSpace(game.GameTitle) || string.IsNullOrWhiteSpace(game.GameUrl) || game.GenreId == 0)
         {
             Notify.Show("Please fill all required fields", "error");
             return;
         }
-        var success = await GamesService.UpdateGameAsync(game);
-        if (success) Nav.NavigateTo($"/game/{id}");
-        else Notify.Show("Failed to update game", "error");
+
+        isSubmitting = true;
+        StateHasChanged();
+
+        try
+        {
+            var success = await GamesService.UpdateGameAsync(game);
+            if (success) Nav.NavigateTo($"/game/{id}");
+            else Notify.Show("Failed to update game", "error");
+        }
+        finally
+        {
+            isSubmitting = false;
+            StateHasChanged();
+        }
     }
 }
