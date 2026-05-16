@@ -47,18 +47,18 @@ else
 
         <!-- Правая колонка -->
         <div class="col-md-8">
-            <!-- Админ-кнопки (видны только админу) -->
+            <!-- Админ-кнопки -->
             @if (userRole == "Admin")
             {
                 <div class="d-flex gap-2 mb-3">
-                    <a href="/games/edit/@Id" class="btn btn-warning">✏️ Edit Game</a>
-                    <button class="btn btn-danger" @onclick="DeleteGame">🗑️ Delete Game</button>
+                    <a href="/games/edit/@Id" class="btn btn-warning">✏️ Редактировать игру</a>
+                    <button class="btn btn-danger" @onclick="DeleteGame">🗑️ Удалить игру</button>
                 </div>
             }
 
             <!-- Рейтинг -->
             <div class="card mb-4 shadow-sm">
-                <div class="card-header"><h5>Rate this Game</h5></div>
+                <div class="card-header"><h5>Оценить эту игру</h5></div>
                 <div class="card-body">
                     @if (rating != null)
                     {
@@ -67,16 +67,16 @@ else
                             {
                                 <span style="color: @(i <= rating.AverageRating ? "#ffc107" : "#ddd"); font-size:1.2rem;">★</span>
                             }
-                            <span class="text-muted">@rating.AverageRating.ToString("0.0") (@rating.TotalVotes votes)</span>
+                            <span class="text-muted">@rating.AverageRating.ToString("0.0") (@rating.TotalVotes оценок)</span>
                         </div>
                     }
                     @if (isAuthenticated)
                     {
                         <div class="d-flex align-items-center">
-                            <span class="me-2">Your rating:</span>
+                            <span class="me-2">Ваша оценка:</span>
                             @for (int i = 1; i <= 5; i++)
                             {
-                                var starValue = i; // локальная копия – ИСПРАВЛЕНИЕ ЗАМЫКАНИЯ
+                                var starValue = i;
                                 <span style="cursor:pointer; font-size:1.5rem; color:@(starValue <= userRatingValue ? "#ffc107" : "#ddd"); margin-right:5px;"
                                       @onclick="() => SubmitRating(starValue)">@(starValue <= userRatingValue ? "★" : "☆")</span>
                             }
@@ -85,7 +85,7 @@ else
                     }
                     else
                     {
-                        <p><a href="/login">Login</a> to rate this game.</p>
+                        <p><a href="/login">Войдите</a> чтобы оценить игру</p>
                     }
                 </div>
             </div>
@@ -101,16 +101,16 @@ else
                                     style="border:none; width:100%; height:100%;" title="@game.GameTitle"></iframe>
                         </div>
                         <div class="text-center mt-3">
-                            <a href="@game.GameUrl" class="btn btn-outline-primary btn-sm" target="_blank">Open in new tab</a>
+                            <a href="@game.GameUrl" class="btn btn-outline-primary btn-sm" target="_blank">Открыть в новом окне</a>
                         </div>
                     }
                     else { <div class="alert alert-warning">No game URL provided.</div> }
                 </div>
             </div>
 
-            <!-- Комментарии -->
+            <!-- Комментарии с аватарками -->
             <div class="card mb-4 shadow-sm">
-                <div class="card-header"><h5>Comments (@(comments?.Count ?? 0))</h5></div>
+                <div class="card-header"><h5>Комментарии (@(comments?.Count ?? 0))</h5></div>
                 <div class="card-body">
                     @if (comments?.Any() == true)
                     {
@@ -118,23 +118,35 @@ else
                             @foreach (var c in comments)
                             {
                                 <li class="list-group-item">
-                                    <strong>@(c.UserName ?? $"User {c.UserId}")</strong>: @c.CommentText
-                                    <small class="text-muted d-block">@c.CreatedDate.ToShortDateString()</small>
+                                    <div class="d-flex align-items-start">
+                                        @if (!string.IsNullOrEmpty(c.AvatarUrl))
+                                        {
+                                            <img src="@c.AvatarUrl" style="width: 32px; height: 32px; object-fit: cover; border-radius: 50%; margin-right: 10px;" />
+                                        }
+                                        else
+                                        {
+                                            <div style="width: 32px; height: 32px; background: #ccc; border-radius: 50%; margin-right: 10px;"></div>
+                                        }
+                                        <div>
+                                            <strong>@(c.UserName ?? $"User {c.UserId}")</strong>: @c.CommentText
+                                            <small class="text-muted d-block">@c.CreatedDate.ToShortDateString()</small>
+                                        </div>
+                                    </div>
                                     @if (userRole == "Admin")
                                     {
-                                        <button class="btn btn-sm btn-danger mt-1" @onclick="() => DeleteComment(c.CommentId)">Delete</button>
+                                        <button class="btn btn-sm btn-danger mt-1" @onclick="() => DeleteComment(c.CommentId)">Удалить</button>
                                     }
                                 </li>
                             }
                         </ul>
                     }
-                    else { <p class="text-muted">No comments yet.</p> }
+                    else { <p class="text-muted">Еще нет комментариев</p> }
 
                     @if (isAuthenticated)
                     {
                         <div class="input-group">
-                            <textarea class="form-control" @bind="newComment" placeholder="Write a comment..." rows="2" maxlength="500"></textarea>
-                            <button class="btn btn-primary" @onclick="AddComment" disabled="@(string.IsNullOrWhiteSpace(newComment))">Send</button>
+                            <textarea class="form-control" @bind="newComment" placeholder="Написать комментарий..." rows="2" maxlength="500"></textarea>
+                            <button class="btn btn-primary" @onclick="AddComment" disabled="@(string.IsNullOrWhiteSpace(newComment))">Отправить</button>
                         </div>
                     }
                 </div>
@@ -186,7 +198,6 @@ else
     {
         if (value < 1) value = 1;
         if (value > 5) value = 5;
-
         if (isRating || !isAuthenticated) return;
         isRating = true;
         StateHasChanged();
@@ -225,12 +236,14 @@ else
         if (success)
         {
             var userName = await AuthService.GetUserNameAsync() ?? "You";
+            var avatarUrl = await AuthService.GetAvatarUrlAsync();
             comments?.Add(new CommentDto
             {
                 CommentText = newComment.Trim(),
                 UserId = userId,
                 CreatedDate = DateTime.UtcNow,
-                UserName = userName
+                UserName = userName,
+                AvatarUrl = avatarUrl
             });
             newComment = "";
             StateHasChanged();

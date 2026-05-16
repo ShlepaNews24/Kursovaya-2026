@@ -4,9 +4,9 @@
 @inject NavigationManager Nav
 @inject INotificationService Notify
 
-<PageTitle>Login</PageTitle>
+<PageTitle>Вход</PageTitle>
 
-<h3>Sign In</h3>
+<h3 class="page-title-block">Вход</h3>
 
 <EditForm Model="@model" OnValidSubmit="@HandleLogin" class="card" style="max-width: 400px;">
     <DataAnnotationsValidator />
@@ -19,24 +19,24 @@
             <ValidationMessage For="@(() => model.Email)" />
         </div>
         <div class="mb-3">
-            <label class="form-label">Password</label>
-            <InputText type="password" class="form-control" @bind-Value="model.Password" placeholder="**" />
+            <label class="form-label">Пароль</label>
+            <InputText type="password" class="form-control" @bind-Value="model.Password" placeholder="********" />
             <ValidationMessage For="@(() => model.Password)" />
         </div>
 
         <button type="submit" class="btn btn-primary w-100" disabled="@isLoading">
             @if (isLoading)
             {
-                <span class="spinner-border spinner-border-sm"></span> <span>Signing in...</span>
+                <span class="spinner-border spinner-border-sm"></span> <span>Вход...</span>
             }
             else
             {
-                <span>Sign In</span>
+                <span>Войти</span>
             }
         </button>
 
         <div class="mt-3 text-center">
-            <small>No account? <a href="/register">Register here</a></small>
+            <small>Нет аккаунта? <a href="/register">Зарегистрироваться</a></small>
         </div>
     </div>
 </EditForm>

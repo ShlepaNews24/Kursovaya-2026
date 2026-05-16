@@ -3,10 +3,10 @@ using Moq;
 using Microsoft.Extensions.Logging;
 using Microsoft.AspNetCore.Http;
 using System.Security.Claims;
-using Microsoft.Extensions.Caching.Memory;
 using GamesPlatform.API.Controllers;
 using GamesPlatform.API.Models;
 using GamesPlatform.API.Interfaces;
+using GamesPlatform.API.Services; 
 using Xunit;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -17,15 +17,15 @@ namespace GamesPlatform.Tests
     {
         private readonly Mock<IUnitOfWork> _mockUow;
         private readonly Mock<ILogger<GamesController>> _mockLogger;
-        private readonly Mock<IMemoryCache> _mockCache;
+        private readonly Mock<IFileService> _mockFileService; // вместо IMemoryCache
         private readonly GamesController _controller;
 
         public GamesControllerTests()
         {
             _mockUow = new Mock<IUnitOfWork>();
             _mockLogger = new Mock<ILogger<GamesController>>();
-            _mockCache = new Mock<IMemoryCache>();
-            _controller = new GamesController(_mockUow.Object, _mockLogger.Object, _mockCache.Object);
+            _mockFileService = new Mock<IFileService>();
+            _controller = new GamesController(_mockUow.Object, _mockLogger.Object, _mockFileService.Object);
         }
 
         [Fact]
@@ -38,11 +38,6 @@ namespace GamesPlatform.Tests
 
             _mockUow.Setup(u => u.GetPagedGamesAsync(1, 10, null, null))
                 .ReturnsAsync((expectedItems, 1));
-
-            // Настройка кеша, чтобы он не мешал (возвращаем false, чтобы выполнился реальный метод)
-            object? cacheEntry = null;
-            _mockCache.Setup(x => x.TryGetValue(It.IsAny<object>(), out cacheEntry)).Returns(false);
-            _mockCache.Setup(x => x.CreateEntry(It.IsAny<object>())).Returns(Mock.Of<ICacheEntry>);
 
             var query = new GamesQueryDto { PageNumber = 1, PageSize = 10 };
             var result = await _controller.GetGames(query);

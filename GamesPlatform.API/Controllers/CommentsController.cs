@@ -1,9 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
+using System.Security.Claims;
 using Microsoft.EntityFrameworkCore;
 using GamesPlatform.API.Data;
 using GamesPlatform.API.Models;
-using Microsoft.AspNetCore.Authorization;
-using System.Security.Claims;
 
 namespace GamesPlatform.API.Controllers
 {
@@ -12,12 +12,16 @@ namespace GamesPlatform.API.Controllers
     public class CommentsController : ControllerBase
     {
         private readonly AppDbContext _context;
-        public CommentsController(AppDbContext context) => _context = context;
+
+        public CommentsController(AppDbContext context)
+        {
+            _context = context;
+        }
 
         [HttpGet("game/{gameId}")]
         public async Task<ActionResult<IEnumerable<CommentDto>>> GetCommentsByGame(int gameId)
         {
-            return await _context.Comments
+            var comments = await _context.Comments
                 .Include(c => c.User)
                 .Where(c => c.GameId == gameId)
                 .OrderByDescending(c => c.CreatedDate)
@@ -28,9 +32,11 @@ namespace GamesPlatform.API.Controllers
                     CreatedDate = c.CreatedDate,
                     UserId = c.UserId,
                     GameId = c.GameId,
-                    UserName = c.User != null ? c.User.UserName : null
+                    UserName = c.User != null ? c.User.UserName : null,
+                    AvatarUrl = c.User != null ? c.User.AvatarUrl : null
                 })
                 .ToListAsync();
+            return Ok(comments);
         }
 
         [HttpPost]
@@ -43,7 +49,7 @@ namespace GamesPlatform.API.Controllers
             var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
             if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out var userId))
                 return Unauthorized();
-            
+
             comment.UserId = userId;
             comment.CreatedDate = DateTime.UtcNow;
 
@@ -64,7 +70,8 @@ namespace GamesPlatform.API.Controllers
                 CreatedDate = comment.CreatedDate,
                 UserId = comment.UserId,
                 GameId = comment.GameId,
-                UserName = user?.UserName
+                UserName = user?.UserName,
+                AvatarUrl = user?.AvatarUrl
             });
         }
 
@@ -74,14 +81,14 @@ namespace GamesPlatform.API.Controllers
         {
             var comment = await _context.Comments.FindAsync(id);
             if (comment == null) return NotFound();
-            
+
             var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
             var userRole = User.FindFirst(ClaimTypes.Role)?.Value;
             if (userIdClaim == null) return Unauthorized();
-            
+
             if (userRole != "Admin" && (!int.TryParse(userIdClaim.Value, out var userId) || comment.UserId != userId))
                 return Forbid("Нет прав на удаление");
-            
+
             _context.Comments.Remove(comment);
             await _context.SaveChangesAsync();
             return NoContent();
@@ -96,5 +103,6 @@ namespace GamesPlatform.API.Controllers
         public int UserId { get; set; }
         public int GameId { get; set; }
         public string? UserName { get; set; }
+        public string? AvatarUrl { get; set; }
     }
 }

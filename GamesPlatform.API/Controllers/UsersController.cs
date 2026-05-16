@@ -4,6 +4,7 @@ using System.Security.Claims;
 using System.ComponentModel.DataAnnotations;
 using GamesPlatform.API.Interfaces;
 using GamesPlatform.API.Models;
+using GamesPlatform.API.Services;
 
 namespace GamesPlatform.API.Controllers
 {
@@ -12,10 +13,12 @@ namespace GamesPlatform.API.Controllers
     public class UsersController : ControllerBase
     {
         private readonly IUnitOfWork _uow;
+        private readonly IFileService _fileService;
 
-        public UsersController(IUnitOfWork uow)
+        public UsersController(IUnitOfWork uow, IFileService fileService)
         {
             _uow = uow;
+            _fileService = fileService;
         }
 
         [HttpGet]
@@ -32,7 +35,8 @@ namespace GamesPlatform.API.Controllers
                 IsActive = u.IsActive,
                 RegistrationDate = u.RegistrationDate,
                 LastLoginDate = u.LastLoginDate,
-                DateOfBirth = u.DateOfBirth
+                DateOfBirth = u.DateOfBirth,
+                AvatarUrl = u.AvatarUrl
             }).ToList();
             return Ok(result);
         }
@@ -52,7 +56,8 @@ namespace GamesPlatform.API.Controllers
                 IsActive = user.IsActive,
                 RegistrationDate = user.RegistrationDate,
                 LastLoginDate = user.LastLoginDate,
-                DateOfBirth = user.DateOfBirth
+                DateOfBirth = user.DateOfBirth,
+                AvatarUrl = user.AvatarUrl
             });
         }
 
@@ -146,6 +151,59 @@ namespace GamesPlatform.API.Controllers
             await _uow.SaveAsync();
             return NoContent();
         }
+
+        [HttpGet("me/avatar")]
+        [Authorize]
+        public async Task<ActionResult<object>> GetMyAvatar()
+        {
+            var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+            var user = await _uow.Users.GetByIdAsync(userId);
+            if (user == null) return NotFound();
+            return Ok(new { avatarUrl = user.AvatarUrl });
+        }
+
+        [HttpPost("me/avatar")]
+        [Authorize]
+        public async Task<ActionResult<object>> UploadAvatar(IFormFile file)
+        {
+            var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+            var user = await _uow.Users.GetByIdAsync(userId);
+            if (user == null) return NotFound();
+
+            if (!_fileService.IsValidFile(file, out var error))
+                return BadRequest(new { error });
+
+            var fileUrl = await _fileService.UploadFileAsync(file, "avatars");
+            if (fileUrl == null)
+                return StatusCode(500, new { error = "Failed to upload avatar" });
+
+            if (!string.IsNullOrEmpty(user.AvatarUrl))
+                await _fileService.DeleteFileAsync(user.AvatarUrl);
+
+            user.AvatarUrl = fileUrl;
+            await _uow.Users.UpdateAsync(user);
+            await _uow.SaveAsync();
+
+            return Ok(new { avatarUrl = fileUrl });
+        }
+        
+        [HttpDelete("me/avatar")]
+        [Authorize]
+        public async Task<IActionResult> DeleteAvatar()
+        {
+            var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+            var user = await _uow.Users.GetByIdAsync(userId);
+            if (user == null) return NotFound();
+
+            if (!string.IsNullOrEmpty(user.AvatarUrl))
+                await _fileService.DeleteFileAsync(user.AvatarUrl);
+
+            user.AvatarUrl = null;
+            await _uow.Users.UpdateAsync(user);
+            await _uow.SaveAsync();
+
+            return NoContent();
+        }
     }
 
     public class UpdateUsernameDto { [Required] public string UserName { get; set; } = string.Empty; }
@@ -162,5 +220,6 @@ namespace GamesPlatform.API.Controllers
         public DateTime RegistrationDate { get; set; }
         public DateTime? LastLoginDate { get; set; }
         public DateTime? DateOfBirth { get; set; }
+        public string? AvatarUrl { get; set; }
     }
 }

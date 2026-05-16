@@ -1,4 +1,4 @@
-// Модель пользователя с поддержкой профиля и связей
+// GamesPlatform.API/Models/User.cs
 using System.ComponentModel.DataAnnotations;
 
 namespace GamesPlatform.API.Models
@@ -25,6 +25,8 @@ namespace GamesPlatform.API.Models
         public DateTime RegistrationDate { get; set; } = DateTime.UtcNow;
         public DateTime? LastLoginDate { get; set; }
         public DateTime? DateOfBirth { get; set; }
+
+        public string? AvatarUrl { get; set; }
 
         public ICollection<Game>? Games { get; set; } = new List<Game>();
         public ICollection<Comment>? Comments { get; set; } = new List<Comment>();

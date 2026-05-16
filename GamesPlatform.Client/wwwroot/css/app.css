@@ -5,6 +5,12 @@
     --sidebar-width: 250px;
 }
 
+html, body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+}
+
 .page {
     position: relative;
     display: flex;
@@ -14,30 +20,31 @@
 
 .sidebar {
     width: var(--sidebar-width);
-    background: linear-gradient(180deg, #1e3a5f 0%, #0d1b2a 100%);
+    background: rgba(30, 58, 95, 0.85);
     min-height: 100vh;
     box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+    backdrop-filter: blur(4px);
 }
 
 main {
     flex: 1;
-    background-color: #f8f9fa;
+    background-color: transparent;
 }
 
 .top-row {
-    background-color: #ffffff;
-    border-bottom: 1px solid #dee2e6;
+    background-color: transparent;
+    border-bottom: none;
     height: 3.5rem;
     display: flex;
     align-items: center;
     justify-content: flex-end;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    box-shadow: none;
 }
 
 .content {
     padding-top: 2rem;
     padding-bottom: 2rem;
-    min-height: calc(100vh - 3.5rem);
+    background-color: transparent;
 }
 
 /* Карточки */
@@ -45,6 +52,7 @@ main {
     border: none;
     border-radius: 12px;
     transition: transform 0.2s ease, box-shadow 0.2s ease;
+    background-color: rgba(255, 255, 255, 0.95);
 }
 
 .card:hover {
@@ -52,7 +60,7 @@ main {
     box-shadow: 0 8px 25px rgba(0,0,0,0.1) !important;
 }
 
-/* Кнопки */
+/* Кнопки (общие) */
 .btn {
     border-radius: 8px;
     font-weight: 500;
@@ -98,11 +106,171 @@ main {
     }
 }
 
-/* Hero секция */
-.display-4 {
-    font-weight: 700;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+/* ========== ФОН СТРАНИЦЫ ========== */
+body {
+    background-image: url('../images/background.jpg');
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
+    background-repeat: no-repeat;
+    background-color: #12101c;
+    margin: 0;
+    padding: 0;
+}
+
+/* ========== ПАГИНАЦИЯ ========== */
+.games-page {
+    display: flex;
+    flex-direction: column;
+}
+.games-page .pagination-container {
+    margin-top: 1rem;
+    padding: 0.5rem 0 1rem;
+}
+
+.pagination .page-link {
+    background-color: rgba(0, 0, 0, 0.7);
+    border-color: rgba(255,255,255,0.3);
+    color: white;
+}
+.pagination .disabled .page-link {
+    background-color: rgba(0, 0, 0, 0.5);
+    color: #aaa;
+}
+.pagination .page-link:hover:not(.disabled) {
+    background-color: rgba(255,255,255,0.2);
+    color: white;
+}
+
+/* ========== ФОН ДЛЯ ПАНЕЛИ АДМИНА/ВЫХОДА ========== */
+.user-info, .auth-buttons {
+    background: rgba(0, 0, 0, 0.6);
+    padding: 0.4rem 0.8rem;
+    border-radius: 20px;
+    backdrop-filter: blur(4px);
+    color: white;
+}
+.user-info span, .auth-buttons a {
+    color: white;
+}
+.user-info .btn-outline-danger {
+    border-color: rgba(255,255,255,0.5);
+    color: white;
+}
+.user-info .btn-outline-danger:hover {
+    background-color: #dc3545;
+    border-color: #dc3545;
+}
+
+/* Кнопки на главной странице (без обводок) */
+.auth-buttons {
+    display: inline-block;
+    padding: 0.6rem 1.2rem;
+    border-radius: 40px;
+}
+.auth-buttons .btn,
+.auth-buttons .btn-primary,
+.auth-buttons .btn-outline-primary {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    color: white !important;
+    padding: 0.4rem 0.8rem;
+    margin: 0 0.2rem;
+    font-size: 1rem;
+    font-weight: normal;
+    text-transform: none;
+}
+.auth-buttons .btn:hover {
+    background: rgba(255, 255, 255, 0.1) !important;
+    transform: none;
+}
+
+/* ========== ЗАГОЛОВОК "Каталог игр" С ПЛАШКОЙ ========== */
+.catalog-title {
+    background: rgba(0, 0, 0, 0.65);
+    display: inline-block;
+    padding: 0.5rem 1.2rem;
+    border-radius: 40px;
+    backdrop-filter: blur(4px);
+    color: white;
+    margin-bottom: 1.2rem;
+    font-weight: 600;
+}
+
+/* ========== ПЛАШКА ДЛЯ ЗАГОЛОВКОВ НА СТРАНИЦАХ ========== */
+.page-title-block {
+    background: rgba(0, 0, 0, 0.65);
+    display: inline-block;
+    padding: 0.5rem 1.5rem;
+    border-radius: 40px;
+    backdrop-filter: blur(4px);
+    color: white;
+    margin-bottom: 1.5rem;
+    font-weight: 600;
+}
+
+/* ========== ПЛАШКА ДЛЯ ЗАГОЛОВКА НА ГЛАВНОЙ ========== */
+.hero-section {
+    text-align: center;
+    padding: 2rem 0 0.5rem 0;
+}
+
+.hero-title-wrapper {
+    background: rgba(0, 0, 0, 0.65);
+    display: inline-block;
+    padding: 1.5rem 3rem;
+    border-radius: 60px;
+    backdrop-filter: blur(4px);
+    margin-bottom: 1rem;
+}
+
+.hero-title-wrapper .display-4 {
+    background: none;
+    -webkit-text-fill-color: white;
+    color: white;
+    margin-bottom: 0.5rem;
+}
+
+.hero-title-wrapper .lead {
+    color: rgba(255, 255, 255, 0.9) !important;
+    margin-bottom: 0;
+}
+
+/* ========== ЛОГОТИП В САЙДБАРЕ НА ВСЮ ШИРИНУ ========== */
+.sidebar .top-row {
+    padding: 0 !important;
+}
+.sidebar .container-fluid {
+    padding: 0 !important;
+}
+.sidebar .navbar-brand {
+    width: 100%;
+    padding: 0;
+    margin: 0;
+    line-height: 0;
+}
+.sidebar .navbar-brand img {
+    width: 100%;
+    height: auto;
+    display: block;
+    object-fit: cover;
+}
+
+/* ========== ИКОНКИ В БОКОВОМ МЕНЮ (ПОЛЬЗОВАТЕЛЬСКИЕ) ========== */
+.nav-icon {
+    width: 32px;          /* было 24px */
+    height: 32px;         /* было 24px */
+    margin-right: 0.75rem;
+    vertical-align: middle;
+}
+
+.nav-link {
+    display: flex;
+    align-items: center;
+    padding: 0.5rem 1rem;
+}
+
+.nav-link img {
+    flex-shrink: 0;
 }

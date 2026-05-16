@@ -11,13 +11,17 @@
         <div class="top-row px-4">
             @if (isAuthenticated)
             {
-                <span><span>👤</span> <span>@(userRole == "Admin" ? "Admin" : "User")</span></span>
-                <button class="btn btn-outline-danger btn-sm ms-2" @onclick="HandleLogout"><span>Logout</span></button>
+                <div class="user-info">
+                    <span>👤 @(userRole == "Admin" ? "Администратор" : "Пользователь")</span>
+                    <button class="btn btn-outline-danger btn-sm ms-2" @onclick="HandleLogout">Выйти</button>
+                </div>
             }
             else
             {
-                <a href="/login" class="btn btn-outline-primary btn-sm"><span>Login</span></a>
-                <a href="/register" class="btn btn-primary btn-sm ms-2"><span>Register</span></a>
+                <div class="auth-buttons">
+                    <a href="/login" class="btn btn-outline-primary btn-sm">Войти</a>
+                    <a href="/register" class="btn btn-primary btn-sm ms-2">Регистрация</a>
+                </div>
             }
         </div>
 
@@ -25,7 +29,7 @@
             @Body
         </article>
     </main>
-    
+
     <ToastNotification />
 </div>
 
@@ -38,7 +42,8 @@
     protected override async Task OnInitializedAsync()
     {
         isAuthenticated = await AuthService.IsAuthenticatedAsync();
-        userRole = await AuthService.GetUserRoleAsync();
+        if (isAuthenticated)
+            userRole = await AuthService.GetUserRoleAsync();
         Notify.OnNotify += OnNotificationReceived;
     }
 
@@ -47,11 +52,13 @@
         await AuthService.LogoutAsync();
         isAuthenticated = false;
         userRole = null;
-        StateHasChanged();
+        Nav.NavigateTo("/", forceLoad: true);
     }
 
     public void Dispose()
     {
         Notify.OnNotify -= OnNotificationReceived;
     }
+
+    [Inject] public NavigationManager Nav { get; set; } = null!;
 }

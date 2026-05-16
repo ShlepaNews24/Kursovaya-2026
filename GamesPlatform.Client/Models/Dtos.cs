@@ -19,6 +19,7 @@ namespace GamesPlatform.Client.Models
         [JsonPropertyName("registrationDate")] public DateTime RegistrationDate { get; set; }
         [JsonPropertyName("lastLoginDate")] public DateTime? LastLoginDate { get; set; }
         [JsonPropertyName("dateOfBirth")] public DateTime? DateOfBirth { get; set; }
+        [JsonPropertyName("avatarUrl")] public string? AvatarUrl { get; set; }
     }
 
     public class GameDto
@@ -50,6 +51,7 @@ namespace GamesPlatform.Client.Models
         [JsonPropertyName("userId")] public int UserId { get; set; }
         [JsonPropertyName("gameId")] public int GameId { get; set; }
         [JsonPropertyName("userName")] public string? UserName { get; set; }
+        [JsonPropertyName("avatarUrl")] public string? AvatarUrl { get; set; }
     }
 
     public class RatingDto
@@ -86,6 +88,7 @@ namespace GamesPlatform.Client.Models
         [JsonPropertyName("registrationDate")] public DateTime RegistrationDate { get; set; }
         [JsonPropertyName("lastLoginDate")] public DateTime? LastLoginDate { get; set; }
         [JsonPropertyName("dateOfBirth")] public DateTime? DateOfBirth { get; set; }
+        [JsonPropertyName("avatarUrl")] public string? AvatarUrl { get; set; }
     }
 
     public class PagedResult<T>
@@ -99,7 +102,6 @@ namespace GamesPlatform.Client.Models
 
     public class UploadLogoResponse
     {
-        [JsonPropertyName("logoUrl")]
-        public string LogoUrl { get; set; } = string.Empty;
+        [JsonPropertyName("logoUrl")] public string LogoUrl { get; set; } = string.Empty;
     }
 }

@@ -5,101 +5,103 @@
 @inject INotificationService Notify
 @inject NavigationManager Nav
 
-<PageTitle>Create Game</PageTitle>
+<PageTitle>Создать игру</PageTitle>
 
 @if (!isAuthenticated)
 {
     <div class="alert alert-warning">
-        ⚠️ <a href="/login">Login</a> to create a game.
+        ⚠️ <a href="/login">Войдите</a>, чтобы создать игру.
     </div>
 }
 else
 {
-    <h3>Create New Game</h3>
+    <div class="create-game-page">
+        <h3 class="page-title-block">Создать новую игру</h3>
 
-    <div class="card" style="max-width: 700px;">
-        <div class="card-body">
-            <EditForm Model="@model" OnValidSubmit="@HandleCreateGame">
-                <DataAnnotationsValidator />
-                <ValidationSummary class="alert alert-danger" />
+        <div class="card" style="max-width: 700px;">
+            <div class="card-body">
+                <EditForm Model="@model" OnValidSubmit="@HandleCreateGame">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary class="alert alert-danger" />
 
-                <div class="mb-3">
-                    <label class="form-label">Game Title *</label>
-                    <InputText class="form-control" @bind-Value="model.GameTitle" />
-                    <ValidationMessage For="@(() => model.GameTitle)" />
-                </div>
+                    <div class="mb-3">
+                        <label class="form-label">Название игры</label>
+                        <InputText class="form-control" @bind-Value="model.GameTitle" />
+                        <ValidationMessage For="@(() => model.GameTitle)" />
+                    </div>
 
-                <div class="mb-3">
-                    <label class="form-label">Description</label>
-                    <InputTextArea class="form-control" @bind-Value="model.Description" rows="3" />
-                    <ValidationMessage For="@(() => model.Description)" />
-                </div>
+                    <div class="mb-3">
+                        <label class="form-label">Описание</label>
+                        <InputTextArea class="form-control" @bind-Value="model.Description" rows="3" />
+                        <ValidationMessage For="@(() => model.Description)" />
+                    </div>
 
-                <div class="mb-3">
-                    <label class="form-label">Genre *</label>
-                    <InputSelect class="form-select" @bind-Value="model.GenreId">
-                        <option value="">-- Select Genre --</option>
-                        @if (genres?.Any() == true)
-                        {
-                            @foreach (var genre in genres)
+                    <div class="mb-3">
+                        <label class="form-label">Жанр</label>
+                        <InputSelect class="form-select" @bind-Value="model.GenreId">
+                            <option value="">-- Выберите жанр --</option>
+                            @if (genres?.Any() == true)
                             {
-                                <option value="@genre.GenreId">@genre.GenreName</option>
+                                @foreach (var genre in genres)
+                                {
+                                    <option value="@genre.GenreId">@genre.GenreName</option>
+                                }
                             }
-                        }
-                    </InputSelect>
-                    <ValidationMessage For="@(() => model.GenreId)" />
-                </div>
+                        </InputSelect>
+                        <ValidationMessage For="@(() => model.GenreId)" />
+                    </div>
 
-                <div class="mb-3">
-                    <label class="form-label">Game URL (iframe) *</label>
-                    <InputText class="form-control" @bind-Value="model.GameUrl" placeholder="https://..." />
-                    <ValidationMessage For="@(() => model.GameUrl)" />
-                    <small class="text-muted">Direct link to the HTML5 game</small>
-                </div>
+                    <div class="mb-3">
+                        <label class="form-label">URL игры</label>
+                        <InputText class="form-control" @bind-Value="model.GameUrl" placeholder="https://..." />
+                        <ValidationMessage For="@(() => model.GameUrl)" />
+                        <small class="text-muted">Прямая ссылка на HTML5-игру</small>
+                    </div>
 
-                <div class="mb-3">
-                    <label class="form-label">Logo (Upload from file)</label>
-                    <InputFile OnChange="OnLogoFileSelected" class="form-control" accept="image/jpeg,image/png,image/gif,image/webp" />
-                    <ValidationMessage For="@(() => model.Logo)" />
-                    <small class="text-muted d-block">Max 5 MB, formats: JPG, PNG, GIF, WEBP</small>
-                    @if (!string.IsNullOrEmpty(uploadedLogoUrl))
-                    {
-                        <div class="mt-2">
-                            <img src="@uploadedLogoUrl" style="height: 80px;" />
-                            <button type="button" class="btn btn-sm btn-danger ms-2" @onclick="ClearUploadedLogo">Remove</button>
-                        </div>
-                    }
-                </div>
-
-                <div class="mb-3">
-                    <label class="form-label">Logo URL (or enter manually)</label>
-                    <InputText class="form-control" @bind-Value="model.Logo" placeholder="https://..." />
-                    <ValidationMessage For="@(() => model.Logo)" />
-                </div>
-
-                <div class="mb-3">
-                    <label class="form-label">Release Date</label>
-                    <InputDate class="form-control" @bind-Value="model.ReleaseDate" />
-                    <ValidationMessage For="@(() => model.ReleaseDate)" />
-                </div>
-
-                <div class="d-flex gap-2">
-                    <button type="submit" class="btn btn-primary" disabled="@isSubmitting">
-                        @if (isSubmitting)
+                    <div class="mb-3">
+                        <label class="form-label">Логотип (загрузить из файла)</label>
+                        <InputFile OnChange="OnLogoFileSelected" class="form-control" accept="image/jpeg,image/png,image/gif,image/webp" />
+                        <ValidationMessage For="@(() => model.Logo)" />
+                        <small class="text-muted d-block">Макс. 5 МБ, форматы: JPG, PNG, GIF, WEBP</small>
+                        @if (!string.IsNullOrEmpty(uploadedLogoUrl))
                         {
-                            <span class="spinner-border spinner-border-sm"></span>
-                            <span>Creating...</span>
+                            <div class="mt-2">
+                                <img src="@uploadedLogoUrl" style="height: 80px;" />
+                                <button type="button" class="btn btn-sm btn-danger ms-2" @onclick="ClearUploadedLogo">Удалить</button>
+                            </div>
                         }
-                        else
-                        {
-                            <span>Create Game</span>
-                        }
-                    </button>
-                    <button type="button" class="btn btn-secondary" @onclick='() => Nav.NavigateTo("/games")'>
-                        Cancel
-                    </button>
-                </div>
-            </EditForm>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">URL логотипа</label>
+                        <InputText class="form-control" @bind-Value="model.Logo" placeholder="https://..." />
+                        <ValidationMessage For="@(() => model.Logo)" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Дата выпуска</label>
+                        <InputDate class="form-control" @bind-Value="model.ReleaseDate" />
+                        <ValidationMessage For="@(() => model.ReleaseDate)" />
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary" disabled="@isSubmitting">
+                            @if (isSubmitting)
+                            {
+                                <span class="spinner-border spinner-border-sm"></span>
+                                <span>Создание...</span>
+                            }
+                            else
+                            {
+                                <span>Создать игру</span>
+                            }
+                        </button>
+                        <button type="button" class="btn btn-secondary" @onclick='() => Nav.NavigateTo("/games")'>
+                            Отмена
+                        </button>
+                    </div>
+                </EditForm>
+            </div>
         </div>
     </div>
 }
@@ -107,7 +109,6 @@ else
 @code {
     private bool isAuthenticated = false;
     private bool isSubmitting = false;
-    private bool isUploadingLogo = false;
     private List<GenreDto>? genres;
     private CreateGameViewModel model = new();
     private string? uploadedLogoUrl;
@@ -125,51 +126,38 @@ else
     {
         var file = e.File;
         if (file == null) return;
-
         if (file.Size > 5 * 1024 * 1024)
         {
-            Notify.Show("File size must be less than 5 MB", "error");
+            Notify.Show("Размер файла не должен превышать 5 МБ", "error");
             return;
         }
-
         var allowedTypes = new[] { "image/jpeg", "image/png", "image/gif", "image/webp" };
         if (!allowedTypes.Contains(file.ContentType))
         {
-            Notify.Show("Allowed formats: JPG, PNG, GIF, WEBP", "error");
+            Notify.Show("Допустимые форматы: JPG, PNG, GIF, WEBP", "error");
             return;
         }
-
-        isUploadingLogo = true;
-        StateHasChanged();
-
         try
         {
-            await using var stream = file.OpenReadStream(maxAllowedSize: 5 * 1024 * 1024);
+            await using var stream = file.OpenReadStream(5 * 1024 * 1024);
             var url = await GamesService.UploadLogoAsync(stream, file.Name);
             if (url != null)
             {
                 uploadedLogoUrl = url;
                 model.Logo = url;
+                Notify.Show("Логотип успешно загружен", "success");
             }
+            else Notify.Show("Не удалось загрузить логотип", "error");
         }
-        finally
-        {
-            isUploadingLogo = false;
-            StateHasChanged();
-        }
+        catch (Exception ex) { Notify.Show($"Ошибка загрузки: {ex.Message}", "error"); }
     }
 
-    private void ClearUploadedLogo()
-    {
-        uploadedLogoUrl = null;
-        model.Logo = null;
-    }
+    private void ClearUploadedLogo() { uploadedLogoUrl = null; model.Logo = null; }
 
     private async Task HandleCreateGame()
     {
         isSubmitting = true;
         StateHasChanged();
-
         try
         {
             var gameDto = new GameDto
@@ -184,10 +172,6 @@ else
             var success = await GamesService.AddGameAsync(gameDto);
             if (success) Nav.NavigateTo("/games");
         }
-        finally
-        {
-            isSubmitting = false;
-            StateHasChanged();
-        }
+        finally { isSubmitting = false; StateHasChanged(); }
     }
 }

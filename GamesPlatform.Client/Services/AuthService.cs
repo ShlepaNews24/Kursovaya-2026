@@ -24,6 +24,11 @@ namespace GamesPlatform.Client.Services
         Task<DateTime?> GetLastLoginDateAsync();
         Task<DateTime?> GetDateOfBirthAsync();
 
+        // Аватар
+        Task<string?> GetAvatarUrlAsync();
+        Task<bool> UploadAvatarAsync(Stream fileStream, string fileName);
+        Task<bool> DeleteAvatarAsync();
+
         // Обновление профиля
         Task<bool> UpdateUserNameAsync(string newUserName);
         Task<bool> UpdateDateOfBirthAsync(DateTime? dateOfBirth);
@@ -47,6 +52,7 @@ namespace GamesPlatform.Client.Services
         private const string REG_DATE_KEY = "reg_date";
         private const string LAST_LOGIN_KEY = "last_login";
         private const string DOB_KEY = "dob";
+        private const string AVATAR_KEY = "avatar_url";
 
         public AuthService(HttpClient http, IJSRuntime js)
         {
@@ -82,7 +88,7 @@ namespace GamesPlatform.Client.Services
 
         public async Task LogoutAsync()
         {
-            var keys = new[] { TOKEN_KEY, USER_ID_KEY, USER_NAME_KEY, USER_ROLE_KEY, USER_EMAIL_KEY, REG_DATE_KEY, LAST_LOGIN_KEY, DOB_KEY };
+            var keys = new[] { TOKEN_KEY, USER_ID_KEY, USER_NAME_KEY, USER_ROLE_KEY, USER_EMAIL_KEY, REG_DATE_KEY, LAST_LOGIN_KEY, DOB_KEY, AVATAR_KEY };
             foreach (var key in keys)
                 await _js.InvokeVoidAsync("localStorage.removeItem", key);
         }
@@ -111,6 +117,55 @@ namespace GamesPlatform.Client.Services
         {
             var val = await _js.InvokeAsync<string?>("localStorage.getItem", DOB_KEY);
             return string.IsNullOrEmpty(val) ? null : DateTime.Parse(val);
+        }
+
+        public async Task<string?> GetAvatarUrlAsync()
+        {
+            return await _js.InvokeAsync<string?>("localStorage.getItem", AVATAR_KEY);
+        }
+
+        public async Task<bool> UploadAvatarAsync(Stream fileStream, string fileName)
+        {
+            try
+            {
+                var token = await GetTokenAsync();
+                if (string.IsNullOrEmpty(token)) return false;
+
+                using var content = new MultipartFormDataContent();
+                var streamContent = new StreamContent(fileStream);
+                streamContent.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+                content.Add(streamContent, "file", fileName);
+
+                var request = new HttpRequestMessage(HttpMethod.Post, "api/users/me/avatar");
+                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+                request.Content = content;
+
+                var response = await _http.SendAsync(request);
+                if (!response.IsSuccessStatusCode) return false;
+
+                var result = await response.Content.ReadFromJsonAsync<AvatarResponse>();
+                if (result?.AvatarUrl != null)
+                    await _js.InvokeVoidAsync("localStorage.setItem", AVATAR_KEY, result.AvatarUrl);
+                return true;
+            }
+            catch { return false; }
+        }
+
+        public async Task<bool> DeleteAvatarAsync()
+        {
+            try
+            {
+                var token = await GetTokenAsync();
+                if (string.IsNullOrEmpty(token)) return false;
+
+                var request = new HttpRequestMessage(HttpMethod.Delete, "api/users/me/avatar");
+                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+                var response = await _http.SendAsync(request);
+                if (response.IsSuccessStatusCode)
+                    await _js.InvokeVoidAsync("localStorage.removeItem", AVATAR_KEY);
+                return response.IsSuccessStatusCode;
+            }
+            catch { return false; }
         }
 
         public async Task<bool> UpdateUserNameAsync(string newUserName)
@@ -226,17 +281,13 @@ namespace GamesPlatform.Client.Services
                 await _js.InvokeVoidAsync("localStorage.setItem", LAST_LOGIN_KEY, authData.LastLoginDate.Value.ToString("o"));
             if (authData.DateOfBirth.HasValue)
                 await _js.InvokeVoidAsync("localStorage.setItem", DOB_KEY, authData.DateOfBirth.Value.ToString("o"));
+            if (!string.IsNullOrEmpty(authData.AvatarUrl))
+                await _js.InvokeVoidAsync("localStorage.setItem", AVATAR_KEY, authData.AvatarUrl);
         }
 
-        private class AuthResponseDto
+        private class AvatarResponse
         {
-            public string Token { get; set; } = string.Empty;
-            public string UserId { get; set; } = string.Empty;
-            public string UserName { get; set; } = string.Empty;
-            public string UserType { get; set; } = string.Empty;
-            public DateTime RegistrationDate { get; set; }
-            public DateTime? LastLoginDate { get; set; }
-            public DateTime? DateOfBirth { get; set; }
+            public string? AvatarUrl { get; set; }
         }
     }
 }

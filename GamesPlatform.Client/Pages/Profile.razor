@@ -4,60 +4,74 @@
 @inject NavigationManager Nav
 @inject INotificationService Notify
 
-<PageTitle>Profile</PageTitle>
+<PageTitle>Мой профиль</PageTitle>
 
 @if (!isLoaded)
 {
     <div class="text-center py-5">
         <div class="spinner-border text-primary"></div>
-        <p class="mt-2">Loading...</p>
+        <p class="mt-2">Загрузка...</p>
     </div>
 }
 else if (!isAuthenticated)
 {
     <div class="alert alert-warning">
-        ⚠️ <a href="/login">Login</a> to view profile.
+        ⚠️ <a href="/login">Войдите</a>, чтобы просмотреть профиль.
     </div>
 }
 else
 {
-    <h3>My Profile</h3>
+    <h3 class="page-title-block">Мой профиль</h3>
+
+    <div class="card mb-4" style="max-width: 600px;">
+        <div class="card-body text-center">
+            @if (!string.IsNullOrEmpty(avatarUrl))
+            {
+                <img src="@avatarUrl" style="width: 100px; height: 100px; object-fit: cover; border-radius: 50%;" />
+                <div class="mt-2">
+                    <button class="btn btn-sm btn-danger" @onclick="DeleteAvatar">Удалить аватар</button>
+                </div>
+            }
+            else
+            {
+                <div style="width: 100px; height: 100px; background: #ccc; border-radius: 50%; margin: 0 auto; display: flex; align-items: center; justify-content: center;">Нет аватара</div>
+            }
+            <div class="mt-3">
+                <InputFile OnChange="OnAvatarSelected" accept="image/jpeg,image/png,image/gif,image/webp" />
+                <small class="text-muted d-block">Макс. 5 МБ, JPG/PNG/GIF/WEBP</small>
+            </div>
+            @if (isUploadingAvatar) { <span class="spinner-border spinner-border-sm"></span> }
+        </div>
+    </div>
 
     <div class="card mb-4" style="max-width: 600px;">
         <div class="card-body">
-            <p><strong>Username:</strong> @userName</p>
+            <p><strong>Имя пользователя:</strong> @userName</p>
             <p><strong>Email:</strong> @userEmail</p>
-            <p><strong>Role:</strong> @userRole</p>
-            <p><strong>Registration Date:</strong> @(registrationDate?.ToString("dd.MM.yyyy HH:mm") ?? "N/A")</p>
-            <p><strong>Last Login:</strong> @(lastLoginDate?.ToString("dd.MM.yyyy HH:mm") ?? "N/A")</p>
-            <p><strong>Date of Birth:</strong> @(dateOfBirth?.ToString("dd.MM.yyyy") ?? "Not set")</p>
-            <button class="btn btn-danger" @onclick="HandleLogout">Logout</button>
+            <p><strong>Роль:</strong> @userRole</p>
+            <p><strong>Дата регистрации:</strong> @(registrationDate?.ToString("dd.MM.yyyy HH:mm") ?? "Н/Д")</p>
+            <p><strong>Последний вход:</strong> @(lastLoginDate?.ToString("dd.MM.yyyy HH:mm") ?? "Н/Д")</p>
+            <p><strong>Дата рождения:</strong> @(dateOfBirth?.ToString("dd.MM.yyyy") ?? "Не указана")</p>
+            <button class="btn btn-danger" @onclick="HandleLogout">Выйти</button>
         </div>
     </div>
 
     <div class="row">
         <div class="col-md-6">
             <div class="card mb-4">
-                <div class="card-header"><h5>Change Nickname</h5></div>
+                <div class="card-header"><h5>Сменить никнейм</h5></div>
                 <div class="card-body">
                     <EditForm Model="@usernameModel" OnValidSubmit="@HandleUpdateUsername">
                         <DataAnnotationsValidator />
                         <ValidationSummary class="alert alert-danger" />
                         <div class="mb-3">
-                            <label class="form-label">New Username</label>
+                            <label class="form-label">Новое имя пользователя</label>
                             <InputText class="form-control" @bind-Value="usernameModel.NewUserName" />
                             <ValidationMessage For="@(() => usernameModel.NewUserName)" />
                         </div>
                         <button type="submit" class="btn btn-primary" disabled="@isUpdatingName">
-                            @if (isUpdatingName)
-                            {
-                                <span class="spinner-border spinner-border-sm"></span>
-                                <span>Updating...</span>
-                            }
-                            else
-                            {
-                                <span>Update Nickname</span>
-                            }
+                            @if (isUpdatingName) { <span class="spinner-border spinner-border-sm"></span> <span>Обновление...</span> }
+                            else { <span>Обновить никнейм</span> }
                         </button>
                     </EditForm>
                 </div>
@@ -66,24 +80,17 @@ else
 
         <div class="col-md-6">
             <div class="card mb-4">
-                <div class="card-header"><h5>Update Date of Birth</h5></div>
+                <div class="card-header"><h5>Обновить дату рождения</h5></div>
                 <div class="card-body">
                     <form @onsubmit="HandleUpdateDateOfBirth">
                         <div class="mb-3">
-                            <label class="form-label">Date of Birth</label>
+                            <label class="form-label">Дата рождения</label>
                             <input type="date" class="form-control" @bind="newDateOfBirth" />
-                            <small class="text-muted">Leave empty to clear</small>
+                            <small class="text-muted">Оставьте пустым, чтобы очистить</small>
                         </div>
                         <button type="submit" class="btn btn-primary" disabled="@isUpdatingDob">
-                            @if (isUpdatingDob)
-                            {
-                                <span class="spinner-border spinner-border-sm"></span>
-                                <span>Saving...</span>
-                            }
-                            else
-                            {
-                                <span>Save Date</span>
-                            }
+                            @if (isUpdatingDob) { <span class="spinner-border spinner-border-sm"></span> <span>Сохранение...</span> }
+                            else { <span>Сохранить дату</span> }
                         </button>
                     </form>
                 </div>
@@ -97,10 +104,12 @@ else
     private bool isAuthenticated = false;
     private bool isUpdatingName = false;
     private bool isUpdatingDob = false;
+    private bool isUploadingAvatar = false;
 
     private string userName = "";
     private string userEmail = "";
     private string userRole = "";
+    private string? avatarUrl;
     private DateTime? registrationDate;
     private DateTime? lastLoginDate;
     private DateTime? dateOfBirth;
@@ -111,83 +120,100 @@ else
     protected override async Task OnInitializedAsync()
     {
         isAuthenticated = await AuthService.IsAuthenticatedAsync();
-
         if (isAuthenticated)
         {
-            userName = await AuthService.GetUserNameAsync() ?? "Unknown";
-            userEmail = await AuthService.GetUserEmailAsync() ?? "Unknown";
-            userRole = await AuthService.GetUserRoleAsync() ?? "User";
+            userName = await AuthService.GetUserNameAsync() ?? "Неизвестно";
+            userEmail = await AuthService.GetUserEmailAsync() ?? "Неизвестно";
+            userRole = await AuthService.GetUserRoleAsync() ?? "Пользователь";
             registrationDate = await AuthService.GetRegistrationDateAsync();
             lastLoginDate = await AuthService.GetLastLoginDateAsync();
             dateOfBirth = await AuthService.GetDateOfBirthAsync();
+            avatarUrl = await AuthService.GetAvatarUrlAsync();
 
             usernameModel.NewUserName = userName;
             newDateOfBirth = dateOfBirth;
         }
-
         isLoaded = true;
+    }
+
+    private async Task OnAvatarSelected(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        if (file == null) return;
+        if (file.Size > 5 * 1024 * 1024) { Notify.Show("Размер файла не должен превышать 5 МБ", "error"); return; }
+        var allowed = new[] { "image/jpeg", "image/png", "image/gif", "image/webp" };
+        if (!allowed.Contains(file.ContentType)) { Notify.Show("Допустимые форматы: JPG, PNG, GIF, WEBP", "error"); return; }
+
+        isUploadingAvatar = true;
+        StateHasChanged();
+        try
+        {
+            await using var stream = file.OpenReadStream(5 * 1024 * 1024);
+            var success = await AuthService.UploadAvatarAsync(stream, file.Name);
+            if (success)
+            {
+                avatarUrl = await AuthService.GetAvatarUrlAsync();
+                Notify.Show("Аватар обновлён", "success");
+            }
+            else Notify.Show("Не удалось загрузить аватар", "error");
+        }
+        finally { isUploadingAvatar = false; StateHasChanged(); }
+    }
+
+    private async Task DeleteAvatar()
+    {
+        if (!await Notify.Confirm("Удалить аватар?")) return;
+        var success = await AuthService.DeleteAvatarAsync();
+        if (success)
+        {
+            avatarUrl = null;
+            Notify.Show("Аватар удалён", "success");
+        }
+        else Notify.Show("Не удалось удалить аватар", "error");
     }
 
     private async Task HandleUpdateUsername()
     {
         if (usernameModel.NewUserName.Trim() == userName)
         {
-            Notify.Show("New username is the same as current", "info");
+            Notify.Show("Новое имя совпадает с текущим", "info");
             return;
         }
-
         isUpdatingName = true;
         StateHasChanged();
-
         try
         {
             var success = await AuthService.UpdateUserNameAsync(usernameModel.NewUserName.Trim());
             if (success)
             {
                 userName = usernameModel.NewUserName.Trim();
-                Notify.Show("Username updated successfully", "success");
+                Notify.Show("Имя пользователя обновлено", "success");
             }
-            else
-            {
-                Notify.Show("Failed to update username", "error");
-            }
+            else Notify.Show("Не удалось обновить имя", "error");
         }
-        finally
-        {
-            isUpdatingName = false;
-            StateHasChanged();
-        }
+        finally { isUpdatingName = false; StateHasChanged(); }
     }
 
     private async Task HandleUpdateDateOfBirth()
     {
         if (newDateOfBirth.HasValue && newDateOfBirth.Value > DateTime.UtcNow)
         {
-            Notify.Show("Date of birth cannot be in the future", "error");
+            Notify.Show("Дата рождения не может быть в будущем", "error");
             return;
         }
-
         isUpdatingDob = true;
         StateHasChanged();
-
         try
         {
             var success = await AuthService.UpdateDateOfBirthAsync(newDateOfBirth);
             if (success)
             {
                 dateOfBirth = newDateOfBirth;
-                Notify.Show("Date of birth updated successfully", "success");
+                Notify.Show("Дата рождения обновлена", "success");
             }
-            else
-            {
-                Notify.Show("Failed to update date of birth", "error");
-            }
+            else Notify.Show("Не удалось обновить дату рождения", "error");
         }
-        finally
-        {
-            isUpdatingDob = false;
-            StateHasChanged();
-        }
+        finally { isUpdatingDob = false; StateHasChanged(); }
     }
 
     private async Task HandleLogout()

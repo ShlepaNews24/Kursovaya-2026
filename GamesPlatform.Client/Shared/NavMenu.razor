@@ -1,6 +1,8 @@
-<div class="top-row ps-3 navbar navbar-dark">
-    <div class="container-fluid">
-        <a class="navbar-brand" href=""><span>Games Platform</span></a>
+<div class="top-row ps-3 navbar navbar-dark" style="padding: 0;">
+    <div class="container-fluid" style="padding: 0;">
+        <a class="navbar-brand w-100 text-center" href="" style="display: block;">
+            <img src="/images/logo.png" alt="Games Platform" style="width: 100%; height: auto; display: block;" />
+        </a>
     </div>
 </div>
 
@@ -8,37 +10,43 @@
     <ul class="nav flex-column">
         <li class="nav-item px-3">
             <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                <span class="bi bi-house-door-fill"></span> <span>Home</span>
+                <img src="/images/icons/home.png" alt="Главная" class="nav-icon" />
+                <span>Главная</span>
             </NavLink>
         </li>
         <li class="nav-item px-3">
             <NavLink class="nav-link" href="games">
-                <span class="bi bi-list"></span> <span>Games</span>
+                <img src="/images/icons/games.png" alt="Игры" class="nav-icon" />
+                <span>Игры</span>
             </NavLink>
         </li>
         @if (IsAuthenticated)
         {
             <li class="nav-item px-3">
                 <NavLink class="nav-link" href="games/create">
-                    <span class="bi bi-plus-circle"></span> <span>Add Game</span>
+                    <img src="/images/icons/add.png" alt="Добавить игру" class="nav-icon" />
+                    <span>Добавить игру</span>
                 </NavLink>
             </li>
             <li class="nav-item px-3">
                 <NavLink class="nav-link" href="profile">
-                    <span class="bi bi-person"></span> <span>Profile</span>
+                    <img src="/images/icons/profile.png" alt="Профиль" class="nav-icon" />
+                    <span>Профиль</span>
                 </NavLink>
             </li>
             @if (UserRole == "Admin")
             {
                 <li class="nav-item px-3">
                     <NavLink class="nav-link" href="admin">
-                        <span class="bi bi-shield-lock"></span> <span>Admin Panel</span>
+                        <img src="/images/icons/admin.png" alt="Панель администратора" class="nav-icon" />
+                        <span>Панель администратора</span>
                     </NavLink>
                 </li>
             }
             <li class="nav-item px-3">
                 <button class="btn btn-link nav-link" @onclick="Logout">
-                    <span class="bi bi-box-arrow-right"></span> <span>Logout</span>
+                    <img src="/images/icons/logout.png" alt="Выйти" class="nav-icon" />
+                    <span>Выйти</span>
                 </button>
             </li>
         }
@@ -46,7 +54,8 @@
         {
             <li class="nav-item px-3">
                 <NavLink class="nav-link" href="login">
-                    <span class="bi bi-box-arrow-in-right"></span> <span>Login</span>
+                    <img src="/images/icons/login.png" alt="Войти" class="nav-icon" />
+                    <span>Войти</span>
                 </NavLink>
             </li>
         }
