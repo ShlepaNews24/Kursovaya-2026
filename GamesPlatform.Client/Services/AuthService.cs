@@ -10,7 +10,7 @@ namespace GamesPlatform.Client.Services
     {
         // Базовая аутентификация
         Task<bool> LoginAsync(string email, string password);
-        Task<bool> RegisterAsync(string userName, string email, string password);
+        Task<(bool Success, string ErrorMessage)> RegisterAsync(string userName, string email, string password);
         Task LogoutAsync();
         Task<bool> IsAuthenticatedAsync();
         Task<string?> GetTokenAsync();
@@ -76,14 +76,28 @@ namespace GamesPlatform.Client.Services
             catch { return false; }
         }
 
-        public async Task<bool> RegisterAsync(string userName, string email, string password)
+        public async Task<(bool Success, string ErrorMessage)> RegisterAsync(string userName, string email, string password)
         {
             try
             {
                 var response = await _http.PostAsJsonAsync("api/auth/register", new { userName, email, password });
-                return response.IsSuccessStatusCode;
+                if (response.IsSuccessStatusCode)
+                    return (true, string.Empty);
+
+                var errorContent = await response.Content.ReadAsStringAsync();
+                try
+                {
+                    var errorObj = System.Text.Json.JsonDocument.Parse(errorContent);
+                    if (errorObj.RootElement.TryGetProperty("message", out var msg))
+                        return (false, msg.GetString() ?? "Ошибка регистрации");
+                }
+                catch { }
+                return (false, errorContent);
             }
-            catch { return false; }
+            catch (Exception ex)
+            {
+                return (false, ex.Message);
+            }
         }
 
         public async Task LogoutAsync()

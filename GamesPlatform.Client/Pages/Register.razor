@@ -55,10 +55,19 @@
     {
         isLoading = true;
         StateHasChanged();
+
         try
         {
-            var success = await AuthService.RegisterAsync(model.UserName, model.Email, model.Password);
-            if (success) Nav.NavigateTo("/login");
+            var (success, errorMessage) = await AuthService.RegisterAsync(model.UserName, model.Email, model.Password);
+            if (success)
+            {
+                Notify.Show("Регистрация успешна! Теперь войдите.", "success");
+                Nav.NavigateTo("/login");
+            }
+            else
+            {
+                Notify.Show(errorMessage, "error");
+            }
         }
         finally
         {
