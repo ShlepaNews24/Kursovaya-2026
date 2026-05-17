@@ -49,10 +49,18 @@
     {
         isLoading = true;
         StateHasChanged();
+
         try
         {
-            var success = await AuthService.LoginAsync(model.Email, model.Password);
-            if (success) Nav.NavigateTo("/games", forceLoad: true);
+            var (success, errorMessage) = await AuthService.LoginAsync(model.Email, model.Password);
+            if (success)
+            {
+                Nav.NavigateTo("/games", forceLoad: true);
+            }
+            else
+            {
+                Notify.Show(errorMessage, "error");
+            }
         }
         finally
         {

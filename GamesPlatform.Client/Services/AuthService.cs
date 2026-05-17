@@ -8,8 +8,8 @@ namespace GamesPlatform.Client.Services
 {
     public interface IAuthService
     {
-        // Базовая аутентификация
-        Task<bool> LoginAsync(string email, string password);
+        // Базовая аутентификация (возвращает успех и сообщение об ошибке)
+        Task<(bool Success, string ErrorMessage)> LoginAsync(string email, string password);
         Task<(bool Success, string ErrorMessage)> RegisterAsync(string userName, string email, string password);
         Task LogoutAsync();
         Task<bool> IsAuthenticatedAsync();
@@ -60,20 +60,36 @@ namespace GamesPlatform.Client.Services
             _js = js;
         }
 
-        public async Task<bool> LoginAsync(string email, string password)
+        public async Task<(bool Success, string ErrorMessage)> LoginAsync(string email, string password)
         {
             try
             {
                 var response = await _http.PostAsJsonAsync("api/auth/login", new { email, password });
-                if (!response.IsSuccessStatusCode) return false;
+                if (response.IsSuccessStatusCode)
+                {
+                    var authData = await response.Content.ReadFromJsonAsync<AuthResponseDto>();
+                    if (authData?.Token != null)
+                    {
+                        await SaveAuthDataAsync(authData, email);
+                        return (true, string.Empty);
+                    }
+                    return (false, "Не удалось получить токен");
+                }
 
-                var authData = await response.Content.ReadFromJsonAsync<AuthResponseDto>();
-                if (authData?.Token == null) return false;
-
-                await SaveAuthDataAsync(authData, email);
-                return true;
+                var errorContent = await response.Content.ReadAsStringAsync();
+                try
+                {
+                    var errorObj = System.Text.Json.JsonDocument.Parse(errorContent);
+                    if (errorObj.RootElement.TryGetProperty("message", out var msg))
+                        return (false, msg.GetString() ?? "Неверный email или пароль");
+                }
+                catch { }
+                return (false, errorContent);
             }
-            catch { return false; }
+            catch (Exception ex)
+            {
+                return (false, ex.Message);
+            }
         }
 
         public async Task<(bool Success, string ErrorMessage)> RegisterAsync(string userName, string email, string password)
