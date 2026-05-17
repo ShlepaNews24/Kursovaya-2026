@@ -37,7 +37,6 @@ namespace GamesPlatform.API.Controllers
             }
             catch (Exception ex)
             {
-                // Возвращаем 400 с сообщением об ошибке (например, Email already exists)
                 return BadRequest(new { message = ex.Message });
             }
         }
