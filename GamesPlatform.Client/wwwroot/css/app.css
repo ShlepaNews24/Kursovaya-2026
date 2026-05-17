@@ -237,9 +237,10 @@ body {
     margin-bottom: 0;
 }
 
-/* ========== ЛОГОТИП В САЙДБАРЕ НА ВСЮ ШИРИНУ ========== */
+/* ========== ЛОГОТИП В САЙДБАРЕ НА ВСЮ ШИРИНУ (ПРИЖАТ К ВЕРХУ) ========== */
 .sidebar .top-row {
     padding: 0 !important;
+    margin: 0 !important;
 }
 .sidebar .container-fluid {
     padding: 0 !important;
@@ -249,6 +250,7 @@ body {
     padding: 0;
     margin: 0;
     line-height: 0;
+    display: block;
 }
 .sidebar .navbar-brand img {
     width: 100%;
@@ -257,10 +259,10 @@ body {
     object-fit: cover;
 }
 
-/* ========== ИКОНКИ В БОКОВОМ МЕНЮ (ПОЛЬЗОВАТЕЛЬСКИЕ) ========== */
+/* ========== ИКОНКИ В БОКОВОМ МЕНЮ ========== */
 .nav-icon {
-    width: 32px;          /* было 24px */
-    height: 32px;         /* было 24px */
+    width: 24px;
+    height: 24px;
     margin-right: 0.75rem;
     vertical-align: middle;
 }
@@ -273,4 +275,10 @@ body {
 
 .nav-link img {
     flex-shrink: 0;
+}
+
+/* Увеличенные иконки для пунктов: Добавить игру, Профиль, Панель администратора, Выйти */
+.large-icon-item .nav-icon {
+    width: 32px;
+    height: 32px;
 }
