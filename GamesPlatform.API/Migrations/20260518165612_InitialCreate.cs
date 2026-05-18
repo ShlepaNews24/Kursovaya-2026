@@ -37,7 +37,8 @@ namespace GamesPlatform.API.Migrations
                     IsActive = table.Column<bool>(type: "INTEGER", nullable: false),
                     RegistrationDate = table.Column<DateTime>(type: "TEXT", nullable: false),
                     LastLoginDate = table.Column<DateTime>(type: "TEXT", nullable: true),
-                    DateOfBirth = table.Column<DateTime>(type: "TEXT", nullable: true)
+                    DateOfBirth = table.Column<DateTime>(type: "TEXT", nullable: true),
+                    AvatarUrl = table.Column<string>(type: "TEXT", nullable: true)
                 },
                 constraints: table =>
                 {
